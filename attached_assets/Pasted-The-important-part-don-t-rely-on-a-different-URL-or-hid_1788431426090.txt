@@ -1,0 +1,294 @@
+The important part: don't rely on a different URL or hidden button for security. The backend must verify the user's role.
+
+🔐 Recommended Login Architecture
+
+CAPACITY CONNECT
+                          │
+                 ┌────────┴────────┐
+                 │                  │
+            User Login          Admin Login
+                 │                  │
+        ┌────────┴────────┐         │
+        ▼        ▼        ▼         ▼
+     Trainee   Trainer   Role      Admin
+        │        │       Check       │
+        ▼        ▼        ▼          ▼
+    Trainee   Trainer            Admin Panel
+    Dashboard Dashboard
+
+URLs
+
+/capacity-connect/login          → Trainee/Trainer
+/capacity-connect/admin/login    → Admin
+
+But the real authorization should happen server-side.
+
+
+---
+
+🤖 Copy-Paste AI Prompt
+
+Give your coding AI this exact prompt:
+
+Capacity Connect — Separate Login Experiences
+
+Implement authentication for my Capacity Connect platform with three roles:
+
+1. TRAINEE
+2. TRAINER
+3. ADMIN
+
+Login Structure
+
+Create two different login experiences:
+
+1. Trainee / Trainer Login
+
+Route:
+
+"/login"
+
+This page is for both Trainees and Trainers.
+
+UI should contain:
+
+- Capacity Connect logo
+- Email
+- Password
+- Login button
+- Forgot password
+- Create account
+- Clear professional design
+
+After successful authentication:
+
+- If role = TRAINEE → redirect to "/trainee/dashboard"
+- If role = TRAINER → redirect to "/trainer/dashboard"
+- If role = ADMIN → DO NOT allow login through this page. Show a message instructing the user to use the Admin Login.
+
+2. Admin Login
+
+Route:
+
+"/admin/login"
+
+Create a completely separate admin login interface.
+
+UI should clearly indicate:
+
+"Administrator Access"
+
+Fields:
+
+- Admin email
+- Password
+- Login button
+- Forgot password
+
+After successful authentication:
+
+- If role = ADMIN → redirect to "/admin/dashboard"
+- If role != ADMIN → deny access and show an appropriate error message.
+
+SECURITY REQUIREMENTS
+
+This is extremely important.
+
+Do NOT implement role protection only in React/client-side code.
+
+The server must verify:
+
+1. User is authenticated.
+2. User's role is valid.
+3. User has permission to access the requested dashboard.
+
+Use Supabase Auth for authentication.
+
+Use the user's database profile/role for authorization.
+
+Use Row Level Security (RLS) for database protection.
+
+Never trust a role value sent from the browser.
+
+A Trainee must never be able to access:
+
+"/admin/dashboard"
+
+A Trainer must never be able to access:
+
+"/admin/dashboard"
+
+A Trainee must never be able to access:
+
+"/trainer/dashboard"
+
+A Trainer must not be able to access another Trainer's restricted data.
+
+An Admin may access authorized administrative functionality.
+
+SIGNUP
+
+Create:
+
+"/signup"
+
+Signup should be available only for Trainees and Trainers.
+
+The signup form should allow the user to select:
+
+- Trainee
+- Trainer
+
+Do NOT allow users to select:
+
+- Admin
+
+Admin accounts must be created/approved through a secure administrative process and must never be obtainable simply by selecting "Admin" during public signup.
+
+ACCOUNT STATUS
+
+Support:
+
+- PENDING
+- APPROVED
+- REJECTED
+- SUSPENDED
+
+A newly registered Trainee or Trainer should have:
+
+"status = PENDING"
+
+If approval is required, they should not receive access to protected platform functionality until approved.
+
+Admin can approve or reject accounts.
+
+REDIRECT LOGIC
+
+Implement centralized role-based redirect logic.
+
+Pseudo-flow:
+
+Authenticated user
+↓
+Fetch profile
+↓
+Check role
+↓
+Check account status
+↓
+Redirect to correct dashboard
+
+TRAINEE → "/trainee/dashboard"
+
+TRAINER → "/trainer/dashboard"
+
+ADMIN → "/admin/dashboard"
+
+PROTECTED ROUTES
+
+Protect:
+
+"/trainee/*"
+
+"/trainer/*"
+
+"/admin/*"
+
+Unauthenticated users should be redirected to the appropriate login page.
+
+Unauthorized users should receive a safe 403-style response or be redirected appropriately.
+
+IMPORTANT
+
+Do not create separate authentication databases for each role.
+
+Use one Supabase Auth system and role-based authorization.
+
+Do not expose Supabase service-role credentials in client-side code.
+
+Do not store passwords in the application's database.
+
+Use secure session handling compatible with Next.js App Router and Supabase SSR.
+
+Before writing code:
+
+1. Explain the authentication architecture.
+2. Explain the authorization architecture.
+3. Show the required database tables/fields.
+4. Show the route protection strategy.
+5. Identify security risks.
+
+Then implement the solution file-by-file.
+---
+
+🎨 Make the two login pages visually different
+
+👨‍🎓 Trainee / Trainer
+
+┌───────────────────────────────────┐
+│         CAPACITY CONNECT          │
+│                                   │
+│       Welcome Back 👋             │
+│                                   │
+│ Email                             │
+│ [________________________]        │
+│                                   │
+│ Password                          │
+│ [________________________]        │
+│                                   │
+│          [ Sign In ]              │
+│                                   │
+│ Don't have an account?            │
+│ [ Create Account ]               │
+│                                   │
+│ Are you an administrator?         │
+│ [ Admin Login ]                  │
+└───────────────────────────────────┘
+
+🛡️ Admin
+
+┌───────────────────────────────────┐
+│         CAPACITY CONNECT          │
+│                                   │
+│       Administrator Access        │
+│                                   │
+│   🔐 Authorized Personnel Only    │
+│                                   │
+│ Admin Email                       │
+│ [________________________]        │
+│                                   │
+│ Password                          │
+│ [________________________]        │
+│                                   │
+│       [ Secure Login ]            │
+│                                   │
+│        ← Back to User Login       │
+└───────────────────────────────────┘
+
+
+
+
+---
+
+🔥 One more thing I'd add
+
+For your Admin login, don't offer:
+
+> "Create Admin Account"
+
+
+
+at all.
+
+Instead:
+
+Public Signup
+     │
+     ├── Trainee
+     └── Trainer
+
+Admin
+  │
+  └── Provisioned securely
+       ↓
+   Admin Login
