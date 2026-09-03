@@ -1,0 +1,1197 @@
+It is a training, competency, and organizational capacity-building platform with three roles: Trainee, Trainer, Admin.
+
+
+
+🚀 CAPACITY CONNECT — Correct Product Architecture
+
+Core idea
+
+> Capacity Connect is a secure learning and competency-management platform connecting trainees, trainers, and administrators through professional profiles, courses, assessments, training resources, competency mapping, and organizational analytics.
+
+
+
+
+---
+
+1. 👥 Three User Roles
+
+CAPACITY CONNECT
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+       TRAINEE          TRAINER           ADMIN
+          │                │                │
+          ▼                ▼                ▼
+    Learn & Grow       Teach & Manage    Control & Monitor
+
+👨‍🎓 Trainee
+
+Can:
+
+✓ Sign up / Login
+✓ Create professional profile
+✓ Add qualifications
+✓ Add work experience
+✓ Add interests
+✓ Add skills
+✓ Add certificates
+✓ Browse courses
+✓ Enroll in courses
+✓ Access learning resources
+✓ Watch recorded lectures
+✓ Download presentations/materials
+✓ Attempt subject-wise MCQs
+✓ View assessment results
+✓ Track progress
+✓ Give course/content feedback
+
+
+---
+
+👨‍🏫 Trainer
+
+Can:
+
+✓ Secure login
+✓ Manage professional profile
+✓ Add qualifications
+✓ Add expertise/skills
+✓ Add subjects
+✓ Create questionnaires
+✓ Set deadlines
+✓ Monitor trainee participation
+✓ Monitor performance
+✓ Upload lectures
+✓ Upload presentations
+✓ Upload study materials
+✓ Manage trainer library
+
+
+---
+
+👨‍💼 Admin
+
+Can:
+
+✓ Approve users
+✓ Manage roles
+✓ Manage trainers
+✓ Manage trainees
+✓ Manage courses
+✓ Monitor enrollments
+✓ Monitor certifications
+✓ Monitor assessments
+✓ Monitor participation
+✓ Publish announcements
+✓ Publish notifications
+✓ Publish achievements
+✓ Publish new learning content
+✓ View platform analytics
+✓ Manage competency mapping
+
+
+---
+
+2. 🧠 The Most Important Feature: Competency Mapping
+
+This should become your standout feature.
+
+Imagine the admin wants a trainer for:
+
+> Python Programming
+
+
+
+Capacity Connect analyzes trainer profiles:
+
+Trainer A
+──────────────
+Python       ✓
+Django       ✓
+Machine Learning ✓
+Experience   5 years
+Certificates 3
+
+MATCH SCORE
+█████████░ 91%
+
+Trainer B:
+
+Python       ✓
+Experience   1 year
+
+MATCH SCORE
+██████░░░░ 61%
+
+Then:
+
+> Recommended Trainer: Trainer A
+
+
+
+Matching factors
+
+Skills
++
+Qualifications
++
+Experience
++
+Certifications
++
+Subject expertise
++
+Trainer performance
+
+For the first version, make this a transparent scoring algorithm rather than pretending it is magical AI.
+
+
+---
+
+3. 🖥️ Homepage
+
+Your homepage should immediately communicate the platform.
+
+┌─────────────────────────────────────────────────────┐
+│ CAPACITY CONNECT       Courses  Trainers  Resources │
+│                               Login   Sign Up        │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│       BUILD SKILLS.                                 │
+│       CONNECT EXPERTISE.                             │
+│       GROW CAPACITY.                                │
+│                                                     │
+│ Training & competency management in one platform.   │
+│                                                     │
+│       [ Explore Courses ] [ Get Started ]           │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│ Latest Announcements                                │
+│ 🎯 New Training Program                             │
+│ 🏆 Achievement                                      │
+│ 📚 New Learning Content                             │
+└─────────────────────────────────────────────────────┘
+
+
+---
+
+4. 📊 Trainee Dashboard
+
+Welcome back, Rahul 👋
+
+┌──────────────┐ ┌──────────────┐
+│ Enrolled     │ │ Completed    │
+│ Courses      │ │ Courses      │
+│     6        │ │     3        │
+└──────────────┘ └──────────────┘
+
+┌──────────────┐ ┌──────────────┐
+│ Assessments  │ │ Certificates │
+│ Completed    │ │ Earned       │
+│     12       │ │     4        │
+└──────────────┘ └──────────────┘
+
+MY COURSES
+────────────────────────────────────
+
+Web Development       72% ███████░░░
+Data Analytics        45% ████░░░░░░
+Communication Skills  90% █████████░
+
+UPCOMING ASSESSMENTS
+────────────────────────────────────
+
+Python Basics MCQ
+Deadline: 12 Sept 2026
+[Attempt Assessment]
+
+
+---
+
+5. 👨‍🏫 Trainer Dashboard
+
+Trainer Dashboard
+
+Courses Created             8
+Active Trainees           127
+Assessments                 14
+Average Performance        78%
+
+────────────────────────────────
+
+MY QUESTIONNAIRES
+
+Python Fundamentals
+Deadline: 12 Sept
+Participation: 87%
+
+────────────────────────────────
+
+TRAINER LIBRARY
+
+🎥 Python Lecture 01
+📊 Python Presentation
+📄 Practice Questions
+📄 Study Notes
+
+
+---
+
+6. 👨‍💼 Admin Dashboard
+
+This should be your biggest dashboard.
+
+ADMIN CONTROL CENTER
+
+Users              2,481
+Trainees           2,020
+Trainers             438
+Pending Approval      23
+
+Courses              146
+Enrollments         8,742
+Assessments        12,840
+Certificates        3,218
+
+Participation       82%
+
+Then:
+
+USER MANAGEMENT
+─────────────────────────────
+Pending Approvals       23
+New Trainers             7
+New Trainees            54
+
+        [Manage Users]
+
+And:
+
+PLATFORM ANALYTICS
+
+Course Enrollment
+     ╭────╮
+─────╯    ╰──────
+
+Assessment Performance
+████████░░ 78%
+
+Training Participation
+█████████░ 84%
+
+
+---
+
+7. 🗄️ DATABASE DESIGN
+
+This description needs a much richer database than my previous answer.
+
+Main tables
+
+users
+profiles
+trainee_profiles
+trainer_profiles
+
+courses
+course_enrollments
+course_resources
+
+assessments
+questions
+question_options
+assessment_attempts
+assessment_answers
+
+trainer_library
+certificates
+feedback
+
+questionnaires
+questionnaire_responses
+
+competencies
+trainer_competencies
+course_competencies
+
+notifications
+announcements
+achievements
+
+user_approvals
+activity_logs
+
+
+---
+
+8. 🔐 User/Authentication Model
+
+I'd structure authentication like:
+
+auth.users
+     │
+     ▼
+profiles
+     │
+ ┌───┼────────────┐
+ ▼   ▼            ▼
+Trainee Trainer   Admin
+
+The profiles table contains:
+
+id
+user_id
+full_name
+email
+role
+status
+avatar_url
+created_at
+updated_at
+
+Role:
+
+TRAINEE
+TRAINER
+ADMIN
+
+Status:
+
+PENDING
+APPROVED
+REJECTED
+SUSPENDED
+
+This directly supports the admin approval requirement.
+
+
+---
+
+9. 👨‍🎓 Trainee Profile
+
+trainee_profiles
+
+id
+user_id
+headline
+bio
+qualifications
+work_experience
+interests
+career_goals
+location
+linkedin_url
+created_at
+updated_at
+
+Skills shouldn't just be one giant text field.
+
+Better:
+
+skills
+──────
+id
+name
+category
+
+and:
+
+trainee_skills
+
+trainee_id
+skill_id
+proficiency
+
+Example:
+
+Python       Advanced
+JavaScript   Intermediate
+SQL          Advanced
+React        Intermediate
+
+
+---
+
+10. 👨‍🏫 Trainer Profile
+
+trainer_profiles
+
+id
+user_id
+bio
+designation
+organization
+experience_years
+qualifications
+specialization
+availability
+created_at
+updated_at
+
+And:
+
+trainer_competencies
+
+trainer_id
+competency_id
+proficiency_level
+years_experience
+
+This feeds directly into competency matching.
+
+
+---
+
+11. 📚 Course Database
+
+courses
+
+id
+title
+description
+category
+level
+trainer_id
+duration
+status
+thumbnail_url
+created_at
+updated_at
+
+Enrollment:
+
+course_enrollments
+
+id
+course_id
+trainee_id
+enrolled_at
+completed_at
+progress
+status
+
+Status:
+
+ENROLLED
+IN_PROGRESS
+COMPLETED
+DROPPED
+
+
+---
+
+12. 📂 Trainer Library
+
+trainer_library
+
+id
+trainer_id
+course_id
+title
+description
+file_url
+file_type
+content_type
+created_at
+
+Content type:
+
+VIDEO
+PRESENTATION
+PDF
+DOCUMENT
+LINK
+
+Trainees enrolled in the relevant course can access the resources.
+
+
+---
+
+13. 📝 MCQ Assessment System
+
+This needs four connected tables.
+
+assessments
+     │
+     ▼
+questions
+     │
+     ▼
+question_options
+
+Then:
+
+assessment_attempts
+     │
+     ▼
+assessment_answers
+
+Assessment
+
+id
+course_id
+trainer_id
+title
+description
+deadline
+duration_minutes
+total_marks
+status
+
+Question
+
+id
+assessment_id
+question_text
+marks
+order_number
+
+Options
+
+id
+question_id
+option_text
+is_correct
+
+Don't send is_correct to the client while the test is being attempted. That's a classic “whoops, the answer key is sitting in DevTools” bug.
+
+
+---
+
+14. 📊 Performance
+
+After submission:
+
+Attempt
+ ↓
+Calculate score
+ ↓
+Store result
+ ↓
+Update trainee statistics
+ ↓
+Trainer sees aggregate performance
+
+Trainee:
+
+Python Assessment
+
+Score
+82%
+
+Correct
+41 / 50
+
+Time
+34 minutes
+
+Result
+PASSED ✓
+
+Trainer:
+
+Participation       87%
+Average Score       76%
+Passed              81%
+Needs Improvement   19%
+
+
+---
+
+15. 📝 Feedback
+
+feedback
+
+id
+trainee_id
+course_id
+resource_id
+rating
+comment
+created_at
+
+Use a 1–5 rating and optional written feedback.
+
+Admin gets:
+
+Course Satisfaction
+★★★★☆ 4.3 / 5
+
+
+---
+
+16. 📢 Homepage Publishing System
+
+Admin can publish:
+
+Notification
+
+notifications
+
+id
+title
+message
+type
+priority
+published_at
+expires_at
+
+Announcement
+
+announcements
+
+id
+title
+content
+image_url
+published_at
+status
+
+Achievement
+
+achievements
+
+id
+title
+description
+image_url
+published_at
+
+Learning content
+
+Can reference courses/resources.
+
+
+---
+
+17. 🧠 Competency Engine
+
+This is where we can make Capacity Connect genuinely interesting.
+
+Define:
+
+competencies
+
+id
+name
+category
+description
+
+Example:
+
+Python
+Data Analysis
+Machine Learning
+Communication
+Leadership
+Project Management
+Cybersecurity
+Cloud Computing
+
+Trainer:
+
+Trainer X
+
+Python             Advanced
+Data Analysis      Advanced
+Machine Learning   Intermediate
+
+Course:
+
+Machine Learning Fundamentals
+
+Required:
+Python             Intermediate
+Statistics         Intermediate
+Machine Learning   Beginner
+
+The system can compare requirements against trainer competency.
+
+
+---
+
+18. 🎯 Match Algorithm
+
+For prototype:
+
+Match Score =
+Skill Match       × 40%
+Qualification     × 20%
+Experience        × 20%
+Certification     × 10%
+Past Performance  × 10%
+
+Then:
+
+Trainer A → 92%
+Trainer B → 84%
+Trainer C → 68%
+
+Show why:
+
+Trainer A — 92%
+
+✓ Python: Advanced
+✓ ML: Advanced
+✓ 6 years experience
+✓ Relevant certifications
+✓ Strong trainee feedback
+
+Explainability will make the feature much better than a mysterious “AI score”.
+
+
+---
+
+19. 🤖 Exact AI Prompt — Architecture
+
+Use this as the new master prompt, not the previous hospital prompt:
+
+I am building a production-quality full-stack web platform called
+"Capacity Connect".
+
+IMPORTANT:
+Capacity Connect is a training, learning, competency mapping, and
+organizational capacity-building platform.
+
+It has three roles:
+
+1. TRAINEE
+2. TRAINER
+3. ADMIN
+
+TRAINEE FEATURES:
+- Secure signup/login
+- Professional profile
+- Qualifications
+- Work experience
+- Interests
+- Skills
+- Certificates
+- Browse courses
+- Course enrollment
+- Learning resources
+- Recorded lectures
+- Presentations
+- Study materials
+- Subject-wise MCQ assessments
+- Assessment attempts and results
+- Course/content feedback
+- Progress tracking
+
+TRAINER FEATURES:
+- Secure login
+- Professional profile
+- Qualifications
+- Skills
+- Expertise/subjects
+- Create questionnaires
+- Set deadlines
+- Monitor trainee participation
+- Monitor trainee performance
+- Upload recorded lectures
+- Upload presentations
+- Upload study materials
+- Manage trainer library
+
+ADMIN FEATURES:
+- Approve users
+- Manage roles
+- Manage trainees
+- Manage trainers
+- Manage courses
+- Monitor enrollments
+- Monitor certifications
+- Monitor assessments
+- Monitor participation
+- Publish notifications
+- Publish announcements
+- Publish achievements
+- Publish newly added learning content
+- Admin analytics dashboard
+- Competency management
+- Trainer competency mapping
+
+SPECIAL FEATURE:
+Create a competency mapping system that recommends suitable trainers
+for subjects based on:
+- skills
+- qualifications
+- experience
+- certifications
+- competency levels
+- previous performance
+
+TECH STACK:
+- Next.js App Router
+- TypeScript
+- Tailwind CSS
+- Supabase PostgreSQL
+- Supabase Authentication
+- Supabase Storage
+- GitHub
+- Vercel
+
+SECURITY:
+- Secure authentication
+- Role-based authorization
+- Row Level Security
+- Users can access only data they are authorized to access
+- Trainers cannot modify admin data
+- Trainees cannot modify trainer/admin data
+- Never expose service-role keys
+- Validate all inputs
+- Protect uploaded files
+- Protect assessment answer keys
+- Prevent unauthorized course/resource access
+
+FIRST:
+Do NOT write application code.
+
+First provide:
+1. Complete architecture
+2. ER/database design
+3. User-role permission matrix
+4. Authentication flow
+5. Authorization flow
+6. RLS strategy
+7. Storage architecture
+8. API architecture
+9. Competency matching algorithm
+10. Folder structure
+11. Development phases
+12. Security threat model
+
+Wait for the next instruction.
+
+
+---
+
+20. 🎨 Exact UI Prompt
+
+Design the UI/UX for Capacity Connect.
+
+The platform must feel like a professional modern learning and
+organizational capacity-building platform.
+
+Visual goals:
+- trustworthy
+- modern
+- professional
+- accessible
+- clean
+- responsive
+- easy to navigate
+
+Create separate experiences for:
+- Trainee
+- Trainer
+- Admin
+
+Trainee navigation:
+Dashboard
+My Profile
+Courses
+Assessments
+Resources
+Certificates
+Feedback
+
+Trainer navigation:
+Dashboard
+My Profile
+Courses
+Questionnaires
+Trainees
+Performance
+Trainer Library
+
+Admin navigation:
+Dashboard
+Users
+Approvals
+Roles
+Courses
+Assessments
+Certifications
+Participation
+Competencies
+Announcements
+Achievements
+Analytics
+
+Homepage:
+- Hero section
+- Featured courses
+- Latest announcements
+- Achievements
+- New learning content
+- Trainer highlights
+- CTA
+- Footer
+
+Avoid:
+- meaningless animations
+- fake statistics
+- fake testimonials
+- unnecessary AI chatbots
+- overly complex navigation
+- excessive gradients
+
+Prioritize information hierarchy, accessibility and mobile
+responsiveness.
+
+
+---
+
+21. 📁 Final Folder Structure
+
+capacity-connect/
+│
+├── app/
+│   ├── page.tsx
+│   │
+│   ├── login/
+│   ├── signup/
+│   │
+│   ├── trainee/
+│   │   ├── dashboard/
+│   │   ├── profile/
+│   │   ├── courses/
+│   │   ├── assessments/
+│   │   ├── resources/
+│   │   └── certificates/
+│   │
+│   ├── trainer/
+│   │   ├── dashboard/
+│   │   ├── profile/
+│   │   ├── courses/
+│   │   ├── questionnaires/
+│   │   ├── trainees/
+│   │   ├── performance/
+│   │   └── library/
+│   │
+│   ├── admin/
+│   │   ├── dashboard/
+│   │   ├── users/
+│   │   ├── approvals/
+│   │   ├── courses/
+│   │   ├── assessments/
+│   │   ├── certifications/
+│   │   ├── competencies/
+│   │   ├── announcements/
+│   │   └── analytics/
+│   │
+│   └── api/
+│       ├── courses/
+│       ├── assessments/
+│       ├── users/
+│       ├── trainer-matching/
+│       └── analytics/
+│
+├── components/
+│   ├── ui/
+│   ├── auth/
+│   ├── trainee/
+│   ├── trainer/
+│   ├── admin/
+│   ├── courses/
+│   ├── assessments/
+│   └── dashboard/
+│
+├── lib/
+│   ├── supabase/
+│   ├── auth/
+│   ├── permissions/
+│   ├── competency/
+│   └── validators/
+│
+├── types/
+│   └── database.ts
+│
+├── public/
+│
+├── .env.local
+├── .gitignore
+└── README.md
+
+
+---
+
+22. 🔐 Permission Matrix
+
+Feature	Trainee	Trainer	Admin
+
+Own profile	✅	✅	✅
+Browse courses	✅	✅	✅
+Enroll	✅	❌	✅
+Take MCQ	✅	❌	✅
+Create assessment	❌	✅	✅
+View trainee performance	Own	Assigned	All
+Upload learning material	❌	✅	✅
+Manage users	❌	❌	✅
+Approve users	❌	❌	✅
+Manage roles	❌	❌	✅
+Publish announcements	❌	❌	✅
+Competency management	❌	Limited	✅
+Trainer matching	View/use	View	✅
+Analytics	Own	Assigned	Platform
+
+
+That table should become the foundation of your authorization logic.
+
+
+---
+
+23. 🛡️ Security Features to Put on Your Presentation
+
+Don't just say:
+
+> “Our app is secure.”
+
+
+
+Show the architecture:
+
+Supabase Auth
+      ↓
+Authenticated User
+      ↓
+Role Verification
+      ↓
+Authorization
+      ↓
+RLS Policy
+      ↓
+Database / Storage
+
+And specifically mention:
+
+Role-based access control + Row Level Security + protected storage + validated inputs + assessment answer protection.
+
+That sounds much more credible.
+
+
+---
+
+24. 🏆 Your 5 strongest features for the demo6
+
+Don't try to show every tiny CRUD operation.
+
+Show these:
+
+1. Professional Skill Profile
+
+Trainee
+ ↓
+Skills
+Qualifications
+Experience
+Certificates
+ ↓
+Competency Profile
+
+2. Course → Learning → Assessment
+
+Enroll
+ ↓
+Watch Lecture
+ ↓
+Study Material
+ ↓
+MCQ
+ ↓
+Score
+ ↓
+Progress
+
+3. Trainer Library
+
+Trainer
+ ↓
+Upload Lecture
+ ↓
+Upload PPT
+ ↓
+Upload PDF
+ ↓
+Trainees access content
+
+4. Trainer Competency Matching
+
+Required Subject
+       ↓
+Competency Engine
+       ↓
+Trainer Ranking
+       ↓
+Best-Matched Trainer
+
+5. Admin Command Center
+
+Users
+Courses
+Enrollments
+Assessments
+Certificates
+Participation
+Competencies
+Announcements
+        ↓
+   Analytics
+
+
+---
+
+💥 The demo flow I'd use
+
+Start with:
+
+> “A trainee needs to develop skills in Data Analytics.”
+
+
+
+Then show:
+
+TRAINEE
+ ↓
+Creates profile
+ ↓
+Adds skills & qualifications
+ ↓
+Enrolls in Data Analytics
+ ↓
+Accesses lecture/material
+ ↓
+Attempts assessment
+ ↓
+Gets performance result
+
+Then switch to Trainer:
+
+TRAINER
+ ↓
+Uploads learning content
+ ↓
+Creates assessment
+ ↓
+Monitors participation
+ ↓
+Sees performance
+
+Then Admin:
+
+ADMIN
+ ↓
+Sees platform analytics
+ ↓
+Approves trainer
+ ↓
+Maps competencies
+ ↓
+Finds suitable trainer
+ ↓
+Publishes announcement
+
+And finish with:
+
+> “Capacity Connect doesn't just deliver courses. It connects people, competencies, trainers, learning resources, and organizational capacity in one platform.”

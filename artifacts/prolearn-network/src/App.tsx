@@ -9,7 +9,8 @@ import {
   Compass, FileText, Flame, Heart, Home as HomeIcon,
   Lightbulb, LogOut, MessageCircle, Moon, MoreHorizontal, Pencil, Play,
   Plus, Search, Settings as SettingsIcon, Share2, Sparkles, Sun, Target, ThumbsUp,
-  TrendingUp, UserRound, Users, X, Zap,
+  TrendingUp, UserRound, Users, X, Zap, BarChart3, CheckCircle2, ClipboardCheck,
+  GraduationCap, ShieldCheck, Upload, Layers3, SlidersHorizontal, UserCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -25,6 +26,7 @@ type Course = {
 };
 type Post = { id: number; name: string; role: string; initials: string; time: string; body: string; tags: string[]; likes: number; comments: number; liked?: boolean; };
 type Notice = { id: number; type: 'course' | 'network' | 'achievement' | 'assessment'; title: string; body: string; time: string; read: boolean; };
+type Role = 'TRAINEE' | 'TRAINER' | 'ADMIN';
 
 const courses: Course[] = [
   { id: 'product-storytelling', title: 'Product storytelling for people who build', category: 'Communication', level: 'Intermediate', duration: '4h 20m', lessons: 12, progress: 68, description: 'Make complex work easy to understand, memorable to champion, and impossible to overlook.', trainer: 'Maya Okafor', initials: 'MO', color: '#174f4d', accent: '#f28d72', skills: ['Narrative design', 'Presenting', 'Stakeholder influence'] },
@@ -47,14 +49,28 @@ const initialNotices: Notice[] = [
   { id: 4, type: 'course', title: 'A new resource was added', body: 'Maya added “The three-line brief” to Product storytelling.', time: 'Tue', read: true },
   { id: 5, type: 'network', title: 'You have 3 new people to meet', body: 'Your network is growing around communication and strategy.', time: 'Mon', read: true },
 ];
+const roleCopy: Record<Role, { label: string; description: string }> = {
+  TRAINEE: { label: 'Trainee', description: 'Learn & grow' },
+  TRAINER: { label: 'Trainer', description: 'Teach & manage' },
+  ADMIN: { label: 'Admin', description: 'Control & monitor' },
+};
+const competencySubjects = ['Python Programming', 'Data Analytics', 'Leadership', 'Project Management'];
+const trainerMatches = [
+  { name: 'Aarav Mehta', initials: 'AM', role: 'Senior data engineer · Bengaluru', score: 92, experience: '6 years', skills: ['Python', 'Django', 'Machine Learning'], certifications: 3, performance: '4.9 / 5' },
+  { name: 'Nadia Okoro', initials: 'NO', role: 'Analytics lead · London', score: 84, experience: '4 years', skills: ['Python', 'SQL', 'Data Analysis'], certifications: 2, performance: '4.7 / 5' },
+  { name: 'Ravi Nair', initials: 'RN', role: 'Operations lead · Bengaluru', score: 68, experience: '2 years', skills: ['Python', 'Reporting'], certifications: 1, performance: '4.4 / 5' },
+];
 
 type AppContextValue = {
   theme: 'light' | 'dark'; toggleTheme: () => void;
+  role: Role; switchRole: (role: Role) => void;
   globalSearch: string; setGlobalSearch: (value: string) => void;
   enrolled: string[]; enroll: (id: string) => void; advance: (id: string) => void; progressFor: (id: string) => number;
   posts: Post[]; react: (id: number) => void; follow: (name: string) => void; following: string[];
   publish: (body: string) => void;
   notices: Notice[]; markRead: (id: number) => void; markAllRead: () => void;
+  approvals: { id: number; name: string; role: string; detail: string; initials: string }[];
+  approveUser: (id: number) => void;
   profile: { name: string; role: string; location: string; bio: string; skills: string[] };
   updateProfile: (profile: AppContextValue['profile']) => void;
   toast: (message: string) => void;
@@ -82,12 +98,26 @@ function NoticeToast({ message, close }: { message: string; close: () => void })
 
 function Shell({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
-  const { notices, profile, globalSearch, setGlobalSearch, toast } = useApp();
-  const nav = [
-    { href: '/', label: 'Home', icon: HomeIcon },
-    { href: '/learning', label: 'Learning', icon: BookOpen },
-    { href: '/network', label: 'Network', icon: Users },
-  ];
+  const { notices, profile, role, switchRole, globalSearch, setGlobalSearch, toast } = useApp();
+  const nav = role === 'TRAINER'
+    ? [
+      { href: '/', label: 'Dashboard', icon: HomeIcon },
+      { href: '/learning', label: 'Courses', icon: BookOpen },
+      { href: '/trainer', label: 'Trainer hub', icon: GraduationCap },
+      { href: '/competencies', label: 'Competencies', icon: Target },
+    ]
+    : role === 'ADMIN'
+      ? [
+        { href: '/', label: 'Dashboard', icon: HomeIcon },
+        { href: '/admin', label: 'Control center', icon: ShieldCheck },
+        { href: '/competencies', label: 'Competencies', icon: Target },
+        { href: '/learning', label: 'Courses', icon: BookOpen },
+      ]
+      : [
+        { href: '/', label: 'Home', icon: HomeIcon },
+        { href: '/learning', label: 'Learning', icon: BookOpen },
+        { href: '/network', label: 'Network', icon: Users },
+      ];
   const utility = [
     { href: '/profile', label: 'My profile', icon: UserRound },
     { href: '/notifications', label: 'Notifications', icon: Bell },
@@ -97,10 +127,13 @@ function Shell({ children }: { children: ReactNode }) {
   const NavLink = ({ item }: { item: typeof nav[number] }) => <Link href={item.href} data-testid={`link-${item.label.toLowerCase().replace(' ', '-')}`} className={`nav-item ${location === item.href ? 'active' : ''}`}><item.icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.href === '/notifications' && unread > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[hsl(var(--accent))] px-1 text-[10px] font-bold text-[hsl(var(--foreground))]">{unread}</span>}</Link>;
   return <div className="app-shell noise">
     <aside className="sidebar">
-      <Link href="/" className="mb-12 flex items-center gap-3 px-3" data-testid="link-brand"><div className="brand-mark">p</div><span className="brand-word">prolearn<span className="text-[hsl(var(--sidebar-primary))]">.</span></span></Link>
-      <div className="px-3 pb-3 text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.35)]">Your workspace</div>
+       <Link href="/" className="mb-12 flex items-center gap-3 px-3" data-testid="link-brand"><div className="brand-mark">p</div><span className="brand-word">capacity<span className="text-[hsl(var(--sidebar-primary))]">connect.</span></span></Link>
+       <div className="px-3 pb-3 text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.35)]">Your workspace</div>
+       <div className="mb-3 grid grid-cols-3 gap-1 rounded-lg bg-[hsl(var(--sidebar-accent)/.7)] p-1">
+         {(Object.keys(roleCopy) as Role[]).map((item) => <button key={item} data-testid={`button-role-${item.toLowerCase()}`} onClick={() => { switchRole(item); setLocation(item === 'TRAINER' ? '/trainer' : item === 'ADMIN' ? '/admin' : '/'); toast(`${roleCopy[item].label} workspace active.`); }} className={`rounded-md px-1 py-2 text-[9px] font-bold transition-colors ${role === item ? 'bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.55)] hover:text-[hsl(var(--sidebar-foreground))]'}`}>{roleCopy[item].label}</button>)}
+       </div>
       <nav className="space-y-1">{nav.map((item) => <NavLink key={item.href} item={item} />)}</nav>
-      <div className="mb-3 mt-10 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.35)]">Your presence</div>
+       <div className="mb-3 mt-10 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.35)]">Your presence</div>
       <nav className="space-y-1">{utility.map((item) => <NavLink key={item.href} item={item} />)}</nav>
       <div className="mt-auto rounded-xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent)/.55)] p-3.5">
         <div className="mb-3 flex items-center gap-2.5"><IconAvatar text={initials(profile.name)} size="sm" tone="coral" /><div className="min-w-0"><div className="truncate text-xs font-bold">{profile.name}</div><div className="truncate text-[10px] text-[hsl(var(--sidebar-foreground)/.5)]">{profile.role}</div></div></div>
@@ -108,8 +141,8 @@ function Shell({ children }: { children: ReactNode }) {
       </div>
     </aside>
     <div className="main-frame">
-      <header className="topbar">
-        <div className="topbar-greeting text-[13px] font-semibold text-[hsl(var(--muted-foreground))]">{location === '/' ? 'Tuesday, 14 May 2024' : location === '/learning' ? 'Your learning library' : 'Keep your momentum visible'}</div>
+       <header className="topbar">
+         <div className="topbar-greeting text-[13px] font-semibold text-[hsl(var(--muted-foreground))]">{location === '/' ? (role === 'ADMIN' ? 'Platform overview' : role === 'TRAINER' ? 'Tuesday, 14 May 2024' : 'Tuesday, 14 May 2024') : location === '/learning' ? 'Your learning library' : location === '/competencies' ? 'Competency intelligence' : 'Keep your momentum visible'}</div>
         <div className="top-search"><Search size={15} /><input data-testid="input-global-search" value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { setLocation('/learning'); toast(globalSearch.trim() ? `Searching for “${globalSearch.trim()}”.` : 'Browse the learning library.'); } }} placeholder="Search learning, people..." /></div>
         <div className="flex items-center gap-2"><Link href="/notifications" data-testid="link-top-notifications" className="icon-btn relative"><Bell size={18} />{unread > 0 && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))]" />}</Link><Link href="/profile" data-testid="link-top-profile"><IconAvatar text={initials(profile.name)} size="sm" /></Link></div>
       </header>
@@ -119,7 +152,7 @@ function Shell({ children }: { children: ReactNode }) {
   </div>;
 }
 
-function Home() {
+function TraineeHome() {
   const { profile, enrolled, advance, progressFor, toast } = useApp();
   const [assessment, setAssessment] = useState(false);
   const activeBase = courses.find((course) => course.id === (enrolled[0] || 'product-storytelling')) || courses[0];
@@ -152,6 +185,87 @@ function Home() {
     </div>
     <section className="mt-10 animate-rise stagger-3"><SectionHeading eyebrow="Your footprint" title="Recent activity" action={<Link href="/network" data-testid="link-see-network" className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Open network <ArrowRight size={13} /></Link>} /><div className="card-surface divide-y divide-[hsl(var(--border))]">{activities.map(({ action, title, time, Icon: ActivityIcon }, index) => <div key={title} className="flex items-center gap-4 p-4 sm:p-5"><div className={`grid h-9 w-9 place-items-center rounded-lg ${index === 0 ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]'}`}><ActivityIcon size={16} /></div><div className="min-w-0 flex-1"><div className="text-xs text-[hsl(var(--muted-foreground))]">{action}</div><div data-testid={`text-activity-${index}`} className="truncate text-sm font-semibold">{title}</div></div><span className="hidden text-[11px] text-[hsl(var(--muted-foreground))] sm:block">{time}</span><ChevronDown size={14} className="-rotate-90 text-[hsl(var(--muted-foreground))]" /></div>)}</div></section>
     {assessment && <AssessmentModal close={() => setAssessment(false)} />}
+  </div>;
+}
+
+function Home() {
+  const { role } = useApp();
+  if (role === 'TRAINER') return <TrainerDashboard />;
+  if (role === 'ADMIN') return <AdminDashboard />;
+  return <TraineeHome />;
+}
+
+function TrainerDashboard() {
+  const { toast } = useApp();
+  const [showQuestionnaire, setShowQuestionnaire] = useState(false);
+  const [uploaded, setUploaded] = useState(false);
+  const metrics = [
+    { label: 'Courses created', value: '08', change: '+2 this quarter', Icon: BookOpen },
+    { label: 'Active trainees', value: '127', change: '+18 this month', Icon: Users },
+    { label: 'Assessments', value: '14', change: '3 awaiting review', Icon: ClipboardCheck },
+    { label: 'Avg. performance', value: '78%', change: '+6% from last month', Icon: TrendingUp },
+  ];
+  const questionnaires = [
+    { title: 'Python fundamentals', due: '12 Sept 2026', participation: 87, status: 'Open' },
+    { title: 'Data storytelling checkpoint', due: '18 Sept 2026', participation: 64, status: 'Draft' },
+    { title: 'Working with stakeholders', due: '26 Sept 2026', participation: 91, status: 'Open' },
+  ];
+  return <div className="content-wrap">
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-5 animate-rise">
+      <div><div className="eyebrow mb-3">Trainer workspace</div><h1 className="display-title">Make expertise<br /><span className="serif font-normal italic text-[hsl(var(--primary))]">travel further.</span></h1><p className="mt-3 max-w-lg text-sm leading-6 text-[hsl(var(--muted-foreground))]">Teach with clarity, see where learners need you, and keep your best resources close.</p></div>
+      <button data-testid="button-create-questionnaire" className="btn btn-primary" onClick={() => setShowQuestionnaire(true)}><Plus size={14} /> Create questionnaire</button>
+    </div>
+    <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(({ label, value, change, Icon }, index) => <div key={label} className={`card-surface animate-rise p-5 ${index ? `stagger-${Math.min(index, 3)}` : ''}`}><div className="mb-6 flex items-center justify-between"><span className="eyebrow">{label}</span><Icon size={16} className="text-[hsl(var(--primary))]" /></div><div className="metric-number">{value}</div><div className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">{change}</div></div>)}</div>
+    <div className="grid gap-8 lg:grid-cols-[1.15fr_.85fr]">
+      <section className="animate-rise stagger-1"><SectionHeading eyebrow="Keep learners moving" title="Questionnaires" action={<button className="btn btn-quiet" onClick={() => toast('All questionnaires are in view.')}>View all <ArrowRight size={13} /></button>} /><div className="card-surface divide-y divide-[hsl(var(--border))]">{questionnaires.map((item) => <div key={item.title} className="flex flex-wrap items-center gap-4 p-5"><div className="grid h-10 w-10 place-items-center rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--primary))]"><ClipboardCheck size={17} /></div><div className="min-w-[180px] flex-1"><div className="text-sm font-bold">{item.title}</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Due {item.due} · {item.status}</div></div><div className="w-28"><div className="mb-2 flex justify-between text-[10px]"><span className="text-[hsl(var(--muted-foreground))]">Participation</span><span className="mono">{item.participation}%</span></div><ProgressBar value={item.participation} /></div><button className="icon-btn" onClick={() => toast(`${item.title} opened for review.`)}><ArrowRight size={15} /></button></div>)}</div></section>
+      <section className="animate-rise stagger-2"><SectionHeading eyebrow="Your teaching library" title="Recent resources" action={<button className="btn btn-quiet" onClick={() => { setUploaded(true); toast('Upload area is ready.'); }}><Upload size={13} /> Add resource</button>} /><div className="card-surface p-5"><div className="space-y-3">{['Python lecture 01 · Video', 'Python presentation · Slides', 'Practice questions · PDF', 'Study notes · Document'].map((item, index) => <button key={item} onClick={() => toast(`${item} opened in the trainer library.`)} className="flex w-full items-center gap-3 rounded-lg border border-[hsl(var(--border))] p-3 text-left transition-colors hover:border-[hsl(var(--primary)/.45)] hover:bg-[hsl(var(--secondary)/.45)]"><div className={`grid h-8 w-8 place-items-center rounded-lg ${index === 0 ? 'bg-[hsl(var(--accent)/.2)] text-[hsl(var(--accent-foreground))]' : 'bg-[hsl(var(--secondary))] text-[hsl(var(--primary))]'}`}>{index === 0 ? <Play size={14} /> : <FileText size={14} />}</div><span className="flex-1 text-xs font-semibold">{item}</span><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{index === 0 ? '24 min' : 'Updated today'}</span><ArrowRight size={13} /></button>)}</div>{uploaded && <div className="mt-4 flex items-center gap-2 rounded-lg border border-dashed border-[hsl(var(--primary)/.5)] bg-[hsl(var(--primary)/.06)] p-3 text-xs text-[hsl(var(--primary))]"><CheckCircle2 size={15} /> Drop a lecture, presentation, PDF, or link here.</div>}</div></section>
+    </div>
+    <section className="mt-8 card-surface relative overflow-hidden bg-[hsl(var(--sidebar))] p-6 text-[hsl(var(--sidebar-foreground))] animate-rise stagger-3 sm:p-7"><div className="absolute -right-12 -top-12 h-40 w-40 rounded-full border-[22px] border-[hsl(var(--sidebar-primary)/.13)]" /><div className="relative flex flex-wrap items-center justify-between gap-5"><div><div className="eyebrow text-[hsl(var(--sidebar-primary))]">Competency signal</div><h2 className="serif mt-2 text-3xl">Your strongest demand is in data storytelling.</h2><p className="mt-2 max-w-xl text-xs leading-5 text-[hsl(var(--sidebar-foreground)/.62)]">Learners with this goal are looking for practical feedback and a trainer with your experience.</p></div><Link href="/competencies" className="btn bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]">See trainer matches <ArrowRight size={14} /></Link></div></section>
+    {showQuestionnaire && <div className="modal-backdrop"><div className="modal animate-rise"><div className="flex items-center justify-between border-b border-[hsl(var(--border))] p-5"><div><div className="eyebrow mb-1">Trainer tools</div><h2 className="text-lg font-bold">Create questionnaire</h2></div><button className="icon-btn" onClick={() => setShowQuestionnaire(false)}><X size={18} /></button></div><div className="space-y-4 p-6"><label className="block text-xs font-bold">Questionnaire title<input className="form-input mt-2" defaultValue="New competency checkpoint" /></label><label className="block text-xs font-bold">Course<select className="form-input mt-2"><option>Python fundamentals</option><option>Data storytelling checkpoint</option></select></label><label className="block text-xs font-bold">Deadline<input className="form-input mt-2" type="date" defaultValue="2026-09-20" /></label><div className="flex justify-end gap-2 pt-2"><button className="btn btn-quiet" onClick={() => setShowQuestionnaire(false)}>Cancel</button><button className="btn btn-primary" onClick={() => { setShowQuestionnaire(false); toast('Questionnaire saved as a draft.'); }}><Check size={14} /> Save draft</button></div></div></div></div>}
+  </div>;
+}
+
+function AdminDashboard() {
+  const { approvals, approveUser, toast } = useApp();
+  const [announcement, setAnnouncement] = useState(false);
+  const adminMetrics = [
+    { label: 'Total users', value: '2,481', detail: '2,020 trainees · 438 trainers' },
+    { label: 'Courses', value: '146', detail: '+12 published this quarter' },
+    { label: 'Enrollments', value: '8,742', detail: '82% participation rate' },
+    { label: 'Certificates', value: '3,218', detail: '94% learner satisfaction' },
+  ];
+  return <div className="content-wrap">
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-5 animate-rise"><div><div className="eyebrow mb-3">Admin control center</div><h1 className="display-title">See the whole<br /><span className="serif font-normal italic text-[hsl(var(--primary))]">capacity system.</span></h1><p className="mt-3 max-w-lg text-sm leading-6 text-[hsl(var(--muted-foreground))]">One view across people, learning, performance, and the competencies that keep your organization moving.</p></div><button data-testid="button-publish-announcement" className="btn btn-primary" onClick={() => setAnnouncement(true)}><Plus size={14} /> Publish update</button></div>
+    <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{adminMetrics.map(({ label, value, detail }, index) => <div key={label} className={`card-surface animate-rise p-5 ${index ? `stagger-${Math.min(index, 3)}` : ''}`}><div className="mb-6 flex items-center justify-between"><span className="eyebrow">{label}</span><BarChart3 size={16} className="text-[hsl(var(--primary))]" /></div><div className="metric-number">{value}</div><div className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">{detail}</div></div>)}</div>
+    <div className="grid gap-8 lg:grid-cols-[.9fr_1.1fr]">
+      <section className="animate-rise stagger-1"><SectionHeading eyebrow="Needs your attention" title="Approval queue" action={<span className="pill pill-coral">{approvals.length} pending</span>} /><div className="card-surface divide-y divide-[hsl(var(--border))]">{approvals.length ? approvals.map((person) => <div key={person.id} className="flex items-center gap-3 p-4"><IconAvatar text={person.initials} size="sm" tone="sand" /><div className="min-w-0 flex-1"><div className="text-xs font-bold">{person.name}</div><div className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">{person.role} · {person.detail}</div></div><button className="btn btn-primary px-3 py-2" onClick={() => { approveUser(person.id); toast(`${person.name} approved with ${person.role} access.`); }}><Check size={13} /> Approve</button></div>) : <div className="p-8 text-center"><CheckCircle2 className="mx-auto mb-3 text-[hsl(var(--primary))]" size={25} /><h3 className="font-bold">Queue is clear</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Every profile has been reviewed.</p></div>}</div></section>
+      <section className="animate-rise stagger-2"><SectionHeading eyebrow="Organizational pulse" title="Platform analytics" action={<button className="btn btn-quiet" onClick={() => toast('Analytics export prepared for download.')}>Export report <ArrowRight size={13} /></button>} /><div className="card-surface p-5"><div className="mb-6 flex items-center justify-between"><div><div className="text-sm font-bold">Learning participation</div><div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Active learners across all programs</div></div><span className="metric-number text-[hsl(var(--primary))]">82%</span></div><ProgressBar value={82} /><div className="mt-7 grid grid-cols-3 gap-3">{[['Pass rate', '78%'], ['Active trainers', '438'], ['New content', '24']].map(([label, value]) => <div key={label} className="rounded-xl bg-[hsl(var(--secondary)/.62)] p-4"><div className="mono text-lg font-bold">{value}</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{label}</div></div>)}</div><div className="mt-6 flex items-end gap-2 border-b border-[hsl(var(--border))] pb-1">{[42, 61, 55, 72, 68, 84, 82, 91, 82].map((height, index) => <div key={`${height}-${index}`} className="chart-bar flex-1" style={{ height: `${height * .55}px`, opacity: index === 8 ? 1 : .45 + index * .05 }} />)}</div><div className="mt-2 flex justify-between text-[10px] text-[hsl(var(--muted-foreground))]"><span>Jan</span><span>Sep 2026</span></div></div></section>
+    </div>
+    <section className="mt-8 card-surface animate-rise stagger-3 p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]"><Target size={19} /></div><div><div className="eyebrow">Standout system</div><h2 className="mt-1 text-lg font-bold">Competency mapping is ready for review</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Match trainers to organizational needs with explainable scoring.</p></div></div><Link href="/competencies" className="btn btn-outline">Open competency map <ArrowRight size={14} /></Link></div></section>
+    {announcement && <div className="modal-backdrop"><div className="modal animate-rise"><div className="flex items-center justify-between border-b border-[hsl(var(--border))] p-5"><div><div className="eyebrow mb-1">Homepage publishing</div><h2 className="text-lg font-bold">Publish an update</h2></div><button className="icon-btn" onClick={() => setAnnouncement(false)}><X size={18} /></button></div><div className="space-y-4 p-6"><label className="block text-xs font-bold">Headline<input className="form-input mt-2" defaultValue="New learning content is live" /></label><label className="block text-xs font-bold">Message<textarea className="form-input mt-2 min-h-24 resize-none" defaultValue="Explore the newest paths added by our trainer community." /></label><div className="flex justify-end gap-2 pt-2"><button className="btn btn-quiet" onClick={() => setAnnouncement(false)}>Cancel</button><button className="btn btn-primary" onClick={() => { setAnnouncement(false); toast('Update published to the Capacity Connect home feed.'); }}><Check size={14} /> Publish now</button></div></div></div></div>}
+  </div>;
+}
+
+function Competencies() {
+  const { role, toast } = useApp();
+  const [subject, setSubject] = useState(competencySubjects[0]);
+  const [selected, setSelected] = useState(trainerMatches[0].name);
+  const factors = [
+    { label: 'Skill match', value: '40%', width: 92 },
+    { label: 'Qualifications', value: '20%', width: 86 },
+    { label: 'Experience', value: '20%', width: 78 },
+    { label: 'Certifications', value: '10%', width: 90 },
+    { label: 'Past performance', value: '10%', width: 94 },
+  ];
+  const chosen = trainerMatches.find((trainer) => trainer.name === selected) || trainerMatches[0];
+  return <div className="content-wrap">
+    <div className="mb-8 animate-rise"><div className="eyebrow mb-3">Capacity intelligence</div><h1 className="display-title">Put the right<br /><span className="serif font-normal italic text-[hsl(var(--primary))]">expertise in the room.</span></h1><p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Transparent trainer matching for every competency your organization needs next. No mystery score—just visible evidence.</p></div>
+    <div className="mb-8 grid gap-8 lg:grid-cols-[.7fr_1.3fr]">
+      <section className="card-surface animate-rise p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]"><SlidersHorizontal size={18} /></div><div><div className="eyebrow">Required competency</div><h2 className="mt-1 text-lg font-bold">What does your team need?</h2></div></div><div className="space-y-2">{competencySubjects.map((item) => <button key={item} onClick={() => setSubject(item)} className={`flex w-full items-center justify-between rounded-lg border p-3 text-left text-xs font-semibold transition-colors ${subject === item ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.08)] text-[hsl(var(--primary))]' : 'border-[hsl(var(--border))] hover:bg-[hsl(var(--secondary)/.6)]'}`}>{item}<ChevronDown size={14} className="-rotate-90" /></button>)}</div><div className="mt-6 rounded-xl bg-[hsl(var(--secondary)/.7)] p-4"><div className="flex items-center gap-2 text-xs font-bold"><Layers3 size={14} className="text-[hsl(var(--primary))]" /> How matching works</div><p className="mt-2 text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">Scores combine the evidence your team already trusts: skills, qualifications, experience, certifications, and past performance.</p><div className="mt-4 space-y-2">{factors.map((factor) => <div key={factor.label} className="flex items-center gap-2 text-[10px]"><span className="w-24 text-[hsl(var(--muted-foreground))]">{factor.label}</span><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[hsl(var(--muted))]"><div className="h-full rounded-full bg-[hsl(var(--primary))]" style={{ width: `${factor.width}%` }} /></div><span className="mono w-7 text-right">{factor.value}</span></div>)}</div></div></section>
+      <section className="animate-rise stagger-1"><div className="mb-5 flex items-end justify-between gap-4"><div><div className="eyebrow mb-2">Recommended trainers</div><h2 className="text-[22px] font-bold tracking-[-.045em]">{subject}</h2></div><span className="pill pill-teal">3 matches</span></div><div className="space-y-3">{trainerMatches.map((trainer, index) => <button key={trainer.name} onClick={() => setSelected(trainer.name)} className={`card-surface hoverable flex w-full items-center gap-4 p-4 text-left transition-all ${selected === trainer.name ? 'border-[hsl(var(--primary)/.65)] ring-2 ring-[hsl(var(--primary)/.1)]' : ''}`}><IconAvatar text={trainer.initials} tone={index === 0 ? 'coral' : 'sand'} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold">{trainer.name}</span>{index === 0 && <span className="pill pill-coral">Best match</span>}</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{trainer.role}</div><div className="mt-3 flex flex-wrap gap-1.5">{trainer.skills.map((skill) => <span key={skill} className="tag px-2 py-1 text-[9px]">{skill}</span>)}</div></div><div className="text-right"><div className="metric-number text-[hsl(var(--primary))]">{trainer.score}%</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">match score</div></div></button>)}</div></section>
+    </div>
+    <section className="card-surface animate-rise stagger-2 overflow-hidden"><div className="grid gap-0 lg:grid-cols-[1fr_.75fr]"><div className="p-6 sm:p-7"><div className="eyebrow mb-2">Why this match</div><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-bold tracking-[-.05em]">{chosen.name}</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{chosen.role}</p></div><button className="btn btn-primary" onClick={() => toast(`${chosen.name} added to the ${subject} shortlist.`)}><UserCheck size={14} /> Add to shortlist</button></div><div className="mt-7 grid gap-3 sm:grid-cols-2">{[['Experience', chosen.experience], ['Certificates', String(chosen.certifications)], ['Past feedback', chosen.performance], ['Availability', 'Available now']].map(([label, value]) => <div key={label} className="rounded-xl bg-[hsl(var(--secondary)/.62)] p-4"><div className="mono text-lg font-bold">{value}</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{label}</div></div>)}</div></div><div className="bg-[hsl(var(--sidebar))] p-6 text-[hsl(var(--sidebar-foreground))] sm:p-7"><div className="eyebrow text-[hsl(var(--sidebar-primary))]">A score you can explain</div><div className="mt-5 flex items-center gap-4"><div className="metric-number text-5xl text-[hsl(var(--sidebar-primary))]">{chosen.score}%</div><div className="text-xs leading-5 text-[hsl(var(--sidebar-foreground)/.62)]">overall match<br />for {subject}</div></div><div className="mt-5 space-y-2">{['Python: Advanced', 'ML: Advanced', `${chosen.experience} relevant experience`, 'Relevant certifications', 'Strong trainee feedback'].map((reason) => <div key={reason} className="flex items-center gap-2 text-xs text-[hsl(var(--sidebar-foreground)/.78)]"><Check size={13} className="text-[hsl(var(--sidebar-primary))]" /> {reason}</div>)}</div></div></div></section>
+    {role === 'TRAINEE' && <div className="mt-5 flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]"><Lightbulb size={15} className="text-[hsl(var(--accent-foreground))]" /> Your view is read-only. Admins manage the final assignment; trainers can see their own competency profile.</div>}
   </div>;
 }
 
@@ -226,17 +340,25 @@ function Settings() {
 
 function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>((localStorage.getItem('prolearn-theme') as 'light' | 'dark') || 'light');
+  const [role, setRole] = useState<Role>((localStorage.getItem('prolearn-role') as Role) || 'TRAINEE');
   const [globalSearch, setGlobalSearch] = useState('');
   const [enrolled, setEnrolled] = useState<string[]>(['product-storytelling']);
   const [progresses, setProgresses] = useState<Record<string, number>>(() => Object.fromEntries(courses.map((course) => [course.id, course.progress])));
   const [posts, setPosts] = useState(initialPosts);
   const [following, setFollowing] = useState<string[]>([]);
   const [notices, setNotices] = useState(initialNotices);
+  const [approvals, setApprovals] = useState([
+    { id: 1, name: 'Meera Kapoor', role: 'Trainer', detail: 'Data & analytics · New applicant', initials: 'MK' },
+    { id: 2, name: 'Daniel Mensah', role: 'Trainee', detail: 'Product operations · Accra', initials: 'DM' },
+    { id: 3, name: 'Sofia Chen', role: 'Trainer', detail: 'Leadership & coaching · Singapore', initials: 'SC' },
+  ]);
   const [profile, setProfile] = useState({ name: 'Amina Mensah', role: 'Product operations trainee', location: 'Accra, Ghana', bio: 'I make the messy middle of product work a little clearer. Currently learning in public and collecting better questions.', skills: ['Product thinking', 'Communication', 'Research'] });
   const [toastMessage, setToastMessage] = useState('');
   useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); localStorage.setItem('prolearn-theme', theme); }, [theme]);
+  useEffect(() => { localStorage.setItem('prolearn-role', role); }, [role]);
   const value: AppContextValue = {
     theme, toggleTheme: () => setTheme((current) => current === 'dark' ? 'light' : 'dark'),
+    role, switchRole: setRole,
     globalSearch, setGlobalSearch,
     enrolled, enroll: (id) => setEnrolled((current) => current.includes(id) ? current : [...current, id]),
     advance: (id) => {
@@ -248,13 +370,14 @@ function AppProvider({ children }: { children: ReactNode }) {
     follow: (name) => setFollowing((current) => current.includes(name) ? current.filter((item) => item !== name) : [...current, name]),
     following, publish: (body) => setPosts((current) => [{ id: Date.now(), name: profile.name, role: profile.role, initials: initials(profile.name), time: 'Just now', body, tags: ['#learning-in-public'], likes: 0, comments: 0 }, ...current]),
     notices, markRead: (id) => setNotices((current) => current.map((notice) => notice.id === id ? { ...notice, read: true } : notice)), markAllRead: () => setNotices((current) => current.map((notice) => ({ ...notice, read: true }))),
+    approvals, approveUser: (id) => setApprovals((current) => current.filter((person) => person.id !== id)),
     profile, updateProfile: setProfile, toast: (message) => { setToastMessage(message); window.setTimeout(() => setToastMessage(''), 2800); },
   };
   return <AppContext.Provider value={value}>{children}{toastMessage && <NoticeToast message={toastMessage} close={() => setToastMessage('')} />}</AppContext.Provider>;
 }
 
 function Router() {
-  return <Shell><ErrorRouteBoundary><Switch><Route path="/" component={Home} /><Route path="/learning" component={Learning} /><Route path="/course/:id" component={CourseDetail} /><Route path="/network" component={Network} /><Route path="/profile" component={Profile} /><Route path="/notifications" component={Notifications} /><Route path="/settings" component={Settings} /><Route component={NotFound} /></Switch></ErrorRouteBoundary></Shell>;
+  return <Shell><ErrorRouteBoundary><Switch><Route path="/" component={Home} /><Route path="/learning" component={Learning} /><Route path="/course/:id" component={CourseDetail} /><Route path="/network" component={Network} /><Route path="/trainer" component={TrainerDashboard} /><Route path="/admin" component={AdminDashboard} /><Route path="/competencies" component={Competencies} /><Route path="/profile" component={Profile} /><Route path="/notifications" component={Notifications} /><Route path="/settings" component={Settings} /><Route component={NotFound} /></Switch></ErrorRouteBoundary></Shell>;
 }
 function ErrorRouteBoundary({ children }: { children: ReactNode }) {
   const [location] = useLocation();
