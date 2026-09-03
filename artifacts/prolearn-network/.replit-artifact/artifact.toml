@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "ProLearn Network"
+description = "A LinkedIn-inspired professional learning network where trainees discover courses, track progress, earn credentials, and connect with expert trainers."
+version = "1.0.0"
+id = "artifacts/prolearn-network"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21471
+
+[services.development]
+run = "pnpm --filter @workspace/prolearn-network run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/prolearn-network", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/prolearn-network/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21471"
+BASE_PATH = "/"
