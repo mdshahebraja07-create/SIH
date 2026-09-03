@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { Fragment, type FormEvent, type ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -27,6 +27,11 @@ type Course = {
 type Post = { id: number; name: string; role: string; initials: string; time: string; body: string; tags: string[]; likes: number; comments: number; liked?: boolean; };
 type Notice = { id: number; type: 'course' | 'network' | 'achievement' | 'assessment'; title: string; body: string; time: string; read: boolean; };
 type Role = 'TRAINEE' | 'TRAINER' | 'ADMIN';
+type AccountStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+type AuthUser = {
+  id: string; email: string; name: string; role: Role; status: AccountStatus;
+  location: string; bio: string; skills: string[]; emailVerified: boolean;
+};
 
 const courses: Course[] = [
   { id: 'product-storytelling', title: 'Product storytelling for people who build', category: 'Communication', level: 'Intermediate', duration: '4h 20m', lessons: 12, progress: 68, description: 'Make complex work easy to understand, memorable to champion, and impossible to overlook.', trainer: 'Maya Okafor', initials: 'MO', color: '#174f4d', accent: '#f28d72', skills: ['Narrative design', 'Presenting', 'Stakeholder influence'] },
@@ -90,7 +95,10 @@ const certificates = [
 type AppContextValue = {
   theme: 'light' | 'dark'; toggleTheme: () => void;
   accessibilityMode: boolean; toggleAccessibility: () => void;
-  role: Role; switchRole: (role: Role) => void;
+  user: AuthUser | null; authLoading: boolean;
+  role: Role; signIn: (email: string, password: string, admin?: boolean) => Promise<AuthUser>;
+  signUp: (values: { email: string; password: string; name: string; role: Exclude<Role, 'ADMIN'> }) => Promise<{ message: string; needsEmailVerification?: boolean; status?: AccountStatus }>;
+  signOut: () => Promise<void>;
   globalSearch: string; setGlobalSearch: (value: string) => void;
   enrolled: string[]; enroll: (id: string) => void; advance: (id: string) => void; progressFor: (id: string) => number;
   posts: Post[]; react: (id: number) => void; follow: (name: string) => void; following: string[];
@@ -123,9 +131,85 @@ function NoticeToast({ message, close }: { message: string; close: () => void })
   return <div className="fixed bottom-5 right-5 z-[90] flex animate-rise items-center gap-3 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm text-[hsl(var(--sidebar-foreground))] shadow-2xl"><Check size={16} className="text-[hsl(var(--sidebar-primary))]" />{message}<button data-testid="button-close-toast" onClick={close} className="ml-2 opacity-60 hover:opacity-100"><X size={15} /></button></div>;
 }
 
+function LoadingScreen() {
+  return <div className="auth-page"><div className="auth-loading"><div className="brand-mark">p</div><div className="skeleton h-2 w-24 rounded-full" /></div></div>;
+}
+
+async function authRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(`/api${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+  });
+  const data = await response.json().catch(() => ({})) as T & { message?: string };
+  if (!response.ok) throw new Error(data.message || 'Something went wrong. Please try again.');
+  return data;
+}
+
+function AuthScreen() {
+  const [location, setLocation] = useLocation();
+  const { signIn, signUp } = useApp();
+  const isAdmin = location === '/admin/login';
+  const isSignup = location === '/signup';
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<Exclude<Role, 'ADMIN'>>('TRAINEE');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true); setError(''); setMessage('');
+    try {
+      if (isSignup) {
+        const result = await signUp({ name, email, password, role });
+        setMessage(result.message);
+        if (!result.needsEmailVerification && result.status === 'APPROVED') setLocation('/login');
+      } else {
+        const user = await signIn(email, password, isAdmin);
+        setLocation(user.role === 'ADMIN' ? '/admin' : user.role === 'TRAINER' ? '/trainer' : '/');
+      }
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Please check your details and try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <div className="auth-page noise">
+    <div className="auth-brand"><div className="brand-mark">p</div><span className="brand-word">capacity<span className="text-[hsl(var(--primary))]">connect.</span></span></div>
+    <div className="auth-layout">
+      <section className="auth-intro">
+        <div className="eyebrow mb-4">{isAdmin ? 'Operations access' : isSignup ? 'A better way to grow' : 'Welcome back'}</div>
+        <h1 className="display-title">{isAdmin ? <>Make capacity<br /><span className="serif font-normal italic text-[hsl(var(--primary))]">visible.</span></> : <>Build proof<br /><span className="serif font-normal italic text-[hsl(var(--primary))]">that travels.</span></>}</h1>
+        <p className="mt-5 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">{isAdmin ? 'Review people, skills, and learning signals from one accountable workspace.' : 'Learning that becomes momentum, a stronger profile, and a room of people worth learning with.'}</p>
+        <div className="auth-proof"><div className="auth-proof-mark"><ShieldCheck size={17} /></div><div><div className="text-xs font-bold">One secure workspace</div><div className="mt-1 text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">Your access is checked on the server every time you return.</div></div></div>
+      </section>
+      <section className="auth-card card-surface">
+        <div className="mb-7 flex items-center justify-between"><div><div className="eyebrow mb-2">{isSignup ? 'Create your account' : isAdmin ? 'Admin sign in' : 'Member sign in'}</div><h2 className="text-2xl font-bold tracking-[-.05em]">{isSignup ? 'Start with your next step.' : 'Good to see you.'}</h2></div><div className="grid h-10 w-10 place-items-center rounded-xl bg-[hsl(var(--accent)/.2)] text-[hsl(var(--foreground))]">{isAdmin ? <ShieldCheck size={19} /> : <UserRound size={19} />}</div></div>
+        {isSignup && <label className="mb-4 block text-xs font-bold">Full name<input data-testid="input-signup-name" className="form-input mt-2" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required /></label>}
+        <form onSubmit={submit} className="space-y-4">
+          <label className="block text-xs font-bold">Email address<input data-testid="input-auth-email" className="form-input mt-2" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
+          <label className="block text-xs font-bold">Password<input data-testid="input-auth-password" className="form-input mt-2" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={isSignup ? 'new-password' : 'current-password'} minLength={8} required /><span className="mt-2 block text-[10px] font-normal text-[hsl(var(--muted-foreground))]">Use at least 8 characters.</span></label>
+          {isSignup && <div><div className="mb-2 text-xs font-bold">I am joining as</div><div className="grid grid-cols-2 gap-2">{(['TRAINEE', 'TRAINER'] as const).map((item) => <button type="button" key={item} onClick={() => setRole(item)} className={`rounded-lg border p-3 text-left transition-colors ${role === item ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.08)]' : 'border-[hsl(var(--border))]'}`}><div className="text-xs font-bold">{roleCopy[item].label}</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{role === item && item === 'TRAINER' ? 'Application review required' : roleCopy[item].description}</div></button>)}</div></div>}
+          {error && <div role="alert" className="rounded-lg border border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--destructive)/.08)] p-3 text-xs leading-5 text-[hsl(var(--destructive))]">{error}</div>}
+          {message && <div role="status" className="rounded-lg border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.08)] p-3 text-xs leading-5 text-[hsl(var(--primary))]">{message}</div>}
+          <button data-testid="button-auth-submit" disabled={busy} className="btn btn-primary w-full disabled:opacity-50">{busy ? 'Checking…' : isSignup ? 'Create account' : 'Sign in'} <ArrowRight size={14} /></button>
+        </form>
+        {!isAdmin && !isSignup && <div className="mt-5 text-center text-xs text-[hsl(var(--muted-foreground))]">New here? <button className="font-bold text-[hsl(var(--primary))]" onClick={() => setLocation('/signup')}>Create a member account</button></div>}
+        {!isAdmin && isSignup && <div className="mt-5 text-center text-xs text-[hsl(var(--muted-foreground))]">Already have an account? <button className="font-bold text-[hsl(var(--primary))]" onClick={() => setLocation('/login')}>Sign in</button></div>}
+        {isAdmin && <div className="mt-5 text-center text-xs text-[hsl(var(--muted-foreground))]">Member of the learning network? <button className="font-bold text-[hsl(var(--primary))]" onClick={() => setLocation('/login')}>Use member sign in</button></div>}
+      </section>
+    </div>
+    <div className="auth-footer">Capacity Connect · Learning that strengthens the whole system</div>
+  </div>;
+}
+
 function Shell({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
-  const { notices, profile, role, switchRole, globalSearch, setGlobalSearch, toast } = useApp();
+  const { notices, profile, role, user, globalSearch, setGlobalSearch, toast } = useApp();
   const nav = role === 'TRAINER'
     ? [
       { href: '/', label: 'Dashboard', icon: HomeIcon },
@@ -161,14 +245,12 @@ function Shell({ children }: { children: ReactNode }) {
     <aside className="sidebar">
        <Link href="/" className="mb-12 flex items-center gap-3 px-3" data-testid="link-brand"><div className="brand-mark">p</div><span className="brand-word">capacity<span className="text-[hsl(var(--sidebar-primary))]">connect.</span></span></Link>
        <div className="px-3 pb-3 text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.35)]">Your workspace</div>
-       <div className="mb-3 grid grid-cols-3 gap-1 rounded-lg bg-[hsl(var(--sidebar-accent)/.7)] p-1">
-         {(Object.keys(roleCopy) as Role[]).map((item) => <button key={item} data-testid={`button-role-${item.toLowerCase()}`} onClick={() => { switchRole(item); setLocation(item === 'TRAINER' ? '/trainer' : item === 'ADMIN' ? '/admin' : '/'); toast(`${roleCopy[item].label} workspace active.`); }} className={`rounded-md px-1 py-2 text-[9px] font-bold transition-colors ${role === item ? 'bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.55)] hover:text-[hsl(var(--sidebar-foreground))]'}`}>{roleCopy[item].label}</button>)}
-       </div>
+       <div className="mb-3 flex items-center justify-between rounded-lg bg-[hsl(var(--sidebar-accent)/.7)] px-3 py-2.5"><span className="text-xs font-bold">{roleCopy[role].label}</span><span className="pill bg-[hsl(var(--sidebar-primary)/.18)] text-[hsl(var(--sidebar-primary))]">Verified</span></div>
       <nav className="space-y-1">{nav.map((item) => <NavLink key={item.href} item={item} />)}</nav>
        <div className="mb-3 mt-10 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.35)]">Your presence</div>
       <nav className="space-y-1">{utility.map((item) => <NavLink key={item.href} item={item} />)}</nav>
       <div className="mt-auto rounded-xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent)/.55)] p-3.5">
-        <div className="mb-3 flex items-center gap-2.5"><IconAvatar text={initials(profile.name)} size="sm" tone="coral" /><div className="min-w-0"><div className="truncate text-xs font-bold">{profile.name}</div><div className="truncate text-[10px] text-[hsl(var(--sidebar-foreground)/.5)]">{profile.role}</div></div></div>
+         <div className="mb-3 flex items-center gap-2.5"><IconAvatar text={initials(profile.name)} size="sm" tone="coral" /><div className="min-w-0"><div className="truncate text-xs font-bold">{profile.name}</div><div className="truncate text-[10px] text-[hsl(var(--sidebar-foreground)/.5)]">{user?.email}</div></div></div>
         <Link href="/profile" data-testid="link-view-profile" className="flex items-center justify-between text-[11px] font-semibold text-[hsl(var(--sidebar-primary))]">View profile <ArrowRight size={13} /></Link>
       </div>
     </aside>
@@ -456,17 +538,18 @@ function Notifications() {
 }
 
 function Settings() {
-  const { theme, toggleTheme, toast } = useApp();
+  const { theme, toggleTheme, toast, user, signOut } = useApp();
   const [email, setEmail] = useState(true);
   const [digest, setDigest] = useState(false);
   const Toggle = ({ value, setValue, label }: { value: boolean; setValue: (value: boolean) => void; label: string }) => <button data-testid={`button-toggle-${label.toLowerCase().replace(' ', '-')}`} onClick={() => setValue(!value)} aria-label={label} className={`relative h-6 w-11 rounded-full transition-colors ${value ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))]'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-[hsl(var(--card))] transition-transform ${value ? 'translate-x-6' : 'translate-x-1'}`} /></button>;
-  return <div className="content-wrap"><div className="mb-8 animate-rise"><div className="eyebrow mb-3">Your preferences</div><h1 className="display-title">Make it yours<span className="text-[hsl(var(--accent))]">.</span></h1><p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">A few small choices for a better learning day.</p></div><div className="max-w-3xl space-y-5"><section className="card-surface animate-rise p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-lg bg-[hsl(var(--secondary))]"><Sun size={17} /></div><div><h2 className="text-sm font-bold">Appearance</h2><p className="text-xs text-[hsl(var(--muted-foreground))]">Choose the atmosphere for your workspace.</p></div></div><div className="flex items-center justify-between border-t border-[hsl(var(--border))] pt-4"><div><div className="text-xs font-semibold">Dark mode</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{theme === 'dark' ? 'Easy on the eyes after hours.' : 'Keep the daylight in.'}</div></div><button data-testid="button-toggle-dark-mode" onClick={() => { toggleTheme(); toast(`${theme === 'dark' ? 'Light' : 'Dark'} mode on.`); }} className="flex items-center gap-2 rounded-full border border-[hsl(var(--border))] p-1.5 pr-3 text-[10px] font-bold"><span className={`grid h-7 w-7 place-items-center rounded-full ${theme === 'dark' ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--secondary))]'}`}>{theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}</span>{theme === 'dark' ? 'Dark' : 'Light'}</button></div></section><section className="card-surface animate-rise stagger-1 p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-lg bg-[hsl(var(--secondary))]"><Bell size={17} /></div><div><h2 className="text-sm font-bold">Notifications</h2><p className="text-xs text-[hsl(var(--muted-foreground))]">Stay close to the moments that move you forward.</p></div></div><div className="divide-y divide-[hsl(var(--border))] border-t border-[hsl(var(--border))]"><div className="flex items-center justify-between py-4"><div><div className="text-xs font-semibold">Learning reminders</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">A gentle nudge when your momentum is waiting.</div></div><Toggle value={email} setValue={setEmail} label="Learning reminders" /></div><div className="flex items-center justify-between py-4"><div><div className="text-xs font-semibold">Weekly reflection</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">A Monday snapshot of your learning footprint.</div></div><Toggle value={digest} setValue={setDigest} label="Weekly reflection" /></div></div></section><section className="card-surface animate-rise stagger-2 p-6"><div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-lg bg-[hsl(var(--secondary))]"><LogOut size={17} /></div><div><h2 className="text-sm font-bold">Account</h2><p className="text-xs text-[hsl(var(--muted-foreground))]">Signed in as amina.mensah@prolearn.network</p></div><button data-testid="button-sign-out" onClick={() => toast('You are staying signed in for this demo.')} className="btn btn-outline ml-auto">Sign out</button></div></section></div></div>;
+  return <div className="content-wrap"><div className="mb-8 animate-rise"><div className="eyebrow mb-3">Your preferences</div><h1 className="display-title">Make it yours<span className="text-[hsl(var(--accent))]">.</span></h1><p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">A few small choices for a better learning day.</p></div><div className="max-w-3xl space-y-5"><section className="card-surface animate-rise p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-lg bg-[hsl(var(--secondary))]"><Sun size={17} /></div><div><h2 className="text-sm font-bold">Appearance</h2><p className="text-xs text-[hsl(var(--muted-foreground))]">Choose the atmosphere for your workspace.</p></div></div><div className="flex items-center justify-between border-t border-[hsl(var(--border))] pt-4"><div><div className="text-xs font-semibold">Dark mode</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{theme === 'dark' ? 'Easy on the eyes after hours.' : 'Keep the daylight in.'}</div></div><button data-testid="button-toggle-dark-mode" onClick={() => { toggleTheme(); toast(`${theme === 'dark' ? 'Light' : 'Dark'} mode on.`); }} className="flex items-center gap-2 rounded-full border border-[hsl(var(--border))] p-1.5 pr-3 text-[10px] font-bold"><span className={`grid h-7 w-7 place-items-center rounded-full ${theme === 'dark' ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--secondary))]'}`}>{theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}</span>{theme === 'dark' ? 'Dark' : 'Light'}</button></div></section><section className="card-surface animate-rise stagger-1 p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-lg bg-[hsl(var(--secondary))]"><Bell size={17} /></div><div><h2 className="text-sm font-bold">Notifications</h2><p className="text-xs text-[hsl(var(--muted-foreground))]">Stay close to the moments that move you forward.</p></div></div><div className="divide-y divide-[hsl(var(--border))] border-t border-[hsl(var(--border))]"><div className="flex items-center justify-between py-4"><div><div className="text-xs font-semibold">Learning reminders</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">A gentle nudge when your momentum is waiting.</div></div><Toggle value={email} setValue={setEmail} label="Learning reminders" /></div><div className="flex items-center justify-between py-4"><div><div className="text-xs font-semibold">Weekly reflection</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">A Monday snapshot of your learning footprint.</div></div><Toggle value={digest} setValue={setDigest} label="Weekly reflection" /></div></div></section><section className="card-surface animate-rise stagger-2 p-6"><div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-lg bg-[hsl(var(--secondary))]"><LogOut size={17} /></div><div><h2 className="text-sm font-bold">Account</h2><p className="text-xs text-[hsl(var(--muted-foreground))]">Signed in as {user?.email}</p></div><button data-testid="button-sign-out" onClick={() => void signOut()} className="btn btn-outline ml-auto">Sign out</button></div></section></div></div>;
 }
 
 function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>((localStorage.getItem('prolearn-theme') as 'light' | 'dark') || 'light');
   const [accessibilityMode, setAccessibilityMode] = useState(localStorage.getItem('capacity-connect-accessibility') === 'on');
-  const [role, setRole] = useState<Role>((localStorage.getItem('prolearn-role') as Role) || 'TRAINEE');
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [globalSearch, setGlobalSearch] = useState('');
   const [enrolled, setEnrolled] = useState<string[]>(['product-storytelling']);
   const [progresses, setProgresses] = useState<Record<string, number>>(() => Object.fromEntries(courses.map((course) => [course.id, course.progress])));
@@ -480,13 +563,27 @@ function AppProvider({ children }: { children: ReactNode }) {
   ]);
   const [profile, setProfile] = useState({ name: 'Amina Mensah', role: 'Product operations trainee', location: 'Accra, Ghana', bio: 'I make the messy middle of product work a little clearer. Currently learning in public and collecting better questions.', skills: ['Product thinking', 'Communication', 'Research'] });
   const [toastMessage, setToastMessage] = useState('');
+  useEffect(() => {
+    void authRequest<{ user: AuthUser }>('/auth/me')
+      .then((result) => { setUser(result.user); setProfile({ name: result.user.name, role: roleCopy[result.user.role].label, location: result.user.location, bio: result.user.bio, skills: result.user.skills }); })
+      .catch(() => setUser(null))
+      .finally(() => setAuthLoading(false));
+  }, []);
   useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); localStorage.setItem('prolearn-theme', theme); }, [theme]);
   useEffect(() => { document.documentElement.classList.toggle('reduced-motion', accessibilityMode); localStorage.setItem('capacity-connect-accessibility', accessibilityMode ? 'on' : 'off'); }, [accessibilityMode]);
-  useEffect(() => { localStorage.setItem('prolearn-role', role); }, [role]);
+  const signIn = async (email: string, password: string, admin = false) => {
+    const result = await authRequest<{ user: AuthUser }>(admin ? '/auth/admin/login' : '/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    setUser(result.user);
+    setProfile({ name: result.user.name, role: roleCopy[result.user.role].label, location: result.user.location, bio: result.user.bio, skills: result.user.skills });
+    return result.user;
+  };
+  const signUp = (values: { email: string; password: string; name: string; role: Exclude<Role, 'ADMIN'> }) => authRequest<{ message: string; needsEmailVerification?: boolean; status?: AccountStatus }>('/auth/signup', { method: 'POST', body: JSON.stringify(values) });
+  const signOut = async () => { await authRequest<void>('/auth/logout', { method: 'POST' }).catch(() => undefined); setUser(null); };
+  const role = user?.role ?? 'TRAINEE';
   const value: AppContextValue = {
     theme, toggleTheme: () => setTheme((current) => current === 'dark' ? 'light' : 'dark'),
     accessibilityMode, toggleAccessibility: () => setAccessibilityMode((current) => !current),
-    role, switchRole: setRole,
+    user, authLoading, role, signIn, signUp, signOut,
     globalSearch, setGlobalSearch,
     enrolled, enroll: (id) => setEnrolled((current) => current.includes(id) ? current : [...current, id]),
     advance: (id) => {
@@ -505,7 +602,21 @@ function AppProvider({ children }: { children: ReactNode }) {
 }
 
 function Router() {
-  return <Shell><ErrorRouteBoundary><Switch><Route path="/" component={Home} /><Route path="/path" component={LearningPath} /><Route path="/learning" component={Learning} /><Route path="/course/:id" component={CourseDetail} /><Route path="/network" component={Network} /><Route path="/trainer" component={TrainerDashboard} /><Route path="/sessions" component={TrainerSessions} /><Route path="/admin" component={AdminDashboard} /><Route path="/insights" component={AdminInsights} /><Route path="/competencies" component={Competencies} /><Route path="/passport" component={SkillPassport} /><Route path="/verify" component={CertificateVerification} /><Route path="/accessibility" component={Accessibility} /><Route path="/profile" component={Profile} /><Route path="/notifications" component={Notifications} /><Route path="/settings" component={Settings} /><Route component={NotFound} /></Switch></ErrorRouteBoundary></Shell>;
+  const [location, setLocation] = useLocation();
+  const { user, authLoading, role } = useApp();
+  if (authLoading) return <LoadingScreen />;
+  if (!user) return <AuthScreen />;
+  if (['/login', '/admin/login', '/signup'].includes(location)) {
+    return <AuthenticatedRedirect role={role} setLocation={setLocation} />;
+  }
+  return <Shell><ErrorRouteBoundary><Switch><Route path="/" component={Home} /><Route path="/path" component={LearningPath} /><Route path="/learning" component={Learning} /><Route path="/course/:id" component={CourseDetail} /><Route path="/network" component={Network} /><Route path="/trainer" component={role === 'TRAINER' ? TrainerDashboard : AccessDenied} /><Route path="/sessions" component={role === 'TRAINER' ? TrainerSessions : AccessDenied} /><Route path="/admin" component={role === 'ADMIN' ? AdminDashboard : AccessDenied} /><Route path="/insights" component={role === 'ADMIN' ? AdminInsights : AccessDenied} /><Route path="/competencies" component={role === 'ADMIN' || role === 'TRAINER' ? Competencies : AccessDenied} /><Route path="/passport" component={SkillPassport} /><Route path="/verify" component={CertificateVerification} /><Route path="/accessibility" component={Accessibility} /><Route path="/profile" component={Profile} /><Route path="/notifications" component={Notifications} /><Route path="/settings" component={Settings} /><Route component={NotFound} /></Switch></ErrorRouteBoundary></Shell>;
+}
+function AuthenticatedRedirect({ role, setLocation }: { role: Role; setLocation: (path: string) => void }) {
+  useEffect(() => { setLocation(role === 'ADMIN' ? '/admin' : role === 'TRAINER' ? '/trainer' : '/'); }, [role, setLocation]);
+  return <LoadingScreen />;
+}
+function AccessDenied() {
+  return <div className="content-wrap"><div className="max-w-xl card-surface p-7"><div className="eyebrow mb-3">Access controlled</div><h1 className="text-2xl font-bold tracking-[-.04em]">This workspace is not part of your role.</h1><p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Your account permissions are checked by the server. Return to your workspace to continue.</p><Link href="/" className="btn btn-primary mt-6">Back to workspace <ArrowRight size={14} /></Link></div></div>;
 }
 function ErrorRouteBoundary({ children }: { children: ReactNode }) {
   const [location] = useLocation();
