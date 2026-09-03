@@ -1,0 +1,1 @@
+- [Capacity Connect demo scope](capacity-connect-demo.md) — the current product story is intentionally demonstrable in frontend-local state; production persistence remains a separate scope.
