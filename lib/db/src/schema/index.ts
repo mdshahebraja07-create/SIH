@@ -11,7 +11,7 @@ export const profiles = pgTable("profiles", {
   skills: jsonb("skills").$type<string[]>().notNull().default([]),
   emailVerified: boolean("email_verified").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
 });
 
 export type Profile = typeof profiles.$inferSelect;
