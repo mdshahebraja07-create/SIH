@@ -32,6 +32,7 @@ type AuthUser = {
   id: string; email: string; name: string; role: Role; status: AccountStatus;
   location: string; bio: string; skills: string[]; emailVerified: boolean;
 };
+type TrainerApplication = AuthUser & { createdAt: string; updatedAt: string };
 
 const courses: Course[] = [
   { id: 'product-storytelling', title: 'Product storytelling for people who build', category: 'Communication', level: 'Intermediate', duration: '4h 20m', lessons: 12, progress: 68, description: 'Make complex work easy to understand, memorable to champion, and impossible to overlook.', trainer: 'Maya Okafor', initials: 'MO', color: '#174f4d', accent: '#f28d72', skills: ['Narrative design', 'Presenting', 'Stakeholder influence'] },
@@ -104,8 +105,9 @@ type AppContextValue = {
   posts: Post[]; react: (id: number) => void; follow: (name: string) => void; following: string[];
   publish: (body: string) => void;
   notices: Notice[]; markRead: (id: number) => void; markAllRead: () => void;
-  approvals: { id: number; name: string; role: string; detail: string; initials: string }[];
-  approveUser: (id: number) => void;
+  approvals: TrainerApplication[];
+  applicationsLoading: boolean; applicationsError: string;
+  updateApplicationStatus: (id: string, status: AccountStatus) => Promise<TrainerApplication>;
   profile: { name: string; role: string; location: string; bio: string; skills: string[] };
   updateProfile: (profile: AppContextValue['profile']) => void;
   toast: (message: string) => void;
@@ -118,6 +120,12 @@ const useApp = () => {
 };
 
 function initials(name: string) { return name.split(' ').map((part) => part[0]).join('').slice(0, 2); }
+function statusLabel(status: AccountStatus) {
+  return status.charAt(0) + status.slice(1).toLowerCase();
+}
+function statusPillClass(status: AccountStatus) {
+  return status === 'APPROVED' ? 'pill-teal' : status === 'PENDING' ? 'pill-coral' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]';
+}
 function IconAvatar({ text, size = 'md', tone = 'teal' }: { text: string; size?: 'sm' | 'md' | 'lg'; tone?: 'teal' | 'coral' | 'sand' }) {
   return <div data-testid={`avatar-${text}`} className={`avatar ${size === 'sm' ? 'h-7 w-7 text-[9px]' : size === 'lg' ? 'h-16 w-16 text-lg' : 'h-9 w-9'} ${tone === 'coral' ? 'bg-[hsl(var(--accent))] text-[hsl(var(--foreground))]' : tone === 'sand' ? 'bg-[#d8ba76] text-[#314444]' : ''}`}>{text}</div>;
 }
@@ -433,8 +441,25 @@ function TrainerDashboard() {
 }
 
 function AdminDashboard() {
-  const { approvals, approveUser, toast } = useApp();
+  const { approvals, applicationsLoading, applicationsError, updateApplicationStatus, toast } = useApp();
   const [announcement, setAnnouncement] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const pendingCount = approvals.filter((application) => application.status === 'PENDING').length;
+  const statusCounts = (['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'] as AccountStatus[]).map((status) => ({
+    status,
+    count: approvals.filter((application) => application.status === status).length,
+  }));
+  const changeStatus = async (application: TrainerApplication, status: AccountStatus) => {
+    setUpdatingId(application.id);
+    try {
+      await updateApplicationStatus(application.id, status);
+      toast(`${application.name} is now ${statusLabel(status).toLowerCase()}.`);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'We could not update that application.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
   const adminMetrics = [
     { label: 'Total users', value: '2,481', detail: '2,020 trainees · 438 trainers' },
     { label: 'Courses', value: '146', detail: '+12 published this quarter' },
@@ -445,7 +470,7 @@ function AdminDashboard() {
     <div className="mb-8 flex flex-wrap items-end justify-between gap-5 animate-rise"><div><div className="eyebrow mb-3">Admin control center</div><h1 className="display-title">See the whole<br /><span className="serif font-normal italic text-[hsl(var(--primary))]">capacity system.</span></h1><p className="mt-3 max-w-lg text-sm leading-6 text-[hsl(var(--muted-foreground))]">One view across people, learning, performance, and the competencies that keep your organization moving.</p></div><button data-testid="button-publish-announcement" className="btn btn-primary" onClick={() => setAnnouncement(true)}><Plus size={14} /> Publish update</button></div>
     <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{adminMetrics.map(({ label, value, detail }, index) => <div key={label} className={`card-surface animate-rise p-5 ${index ? `stagger-${Math.min(index, 3)}` : ''}`}><div className="mb-6 flex items-center justify-between"><span className="eyebrow">{label}</span><BarChart3 size={16} className="text-[hsl(var(--primary))]" /></div><div className="metric-number">{value}</div><div className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">{detail}</div></div>)}</div>
     <div className="grid gap-8 lg:grid-cols-[.9fr_1.1fr]">
-      <section className="animate-rise stagger-1"><SectionHeading eyebrow="Needs your attention" title="Approval queue" action={<span className="pill pill-coral">{approvals.length} pending</span>} /><div className="card-surface divide-y divide-[hsl(var(--border))]">{approvals.length ? approvals.map((person) => <div key={person.id} className="flex items-center gap-3 p-4"><IconAvatar text={person.initials} size="sm" tone="sand" /><div className="min-w-0 flex-1"><div className="text-xs font-bold">{person.name}</div><div className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">{person.role} · {person.detail}</div></div><button className="btn btn-primary px-3 py-2" onClick={() => { approveUser(person.id); toast(`${person.name} approved with ${person.role} access.`); }}><Check size={13} /> Approve</button></div>) : <div className="p-8 text-center"><CheckCircle2 className="mx-auto mb-3 text-[hsl(var(--primary))]" size={25} /><h3 className="font-bold">Queue is clear</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Every profile has been reviewed.</p></div>}</div></section>
+      <section className="animate-rise stagger-1"><SectionHeading eyebrow="Needs your attention" title="Trainer applications" action={<span className="pill pill-coral">{pendingCount} pending · {approvals.length} total</span>} /><div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{statusCounts.map(({ status, count }) => <div key={status} className="rounded-xl border border-[hsl(var(--border))] p-3"><div className={`pill ${statusPillClass(status)}`}>{statusLabel(status)}</div><div className="mt-2 metric-number text-xl">{count}</div></div>)}</div><div className="card-surface divide-y divide-[hsl(var(--border))]">{applicationsLoading ? <div className="p-8 text-center text-xs text-[hsl(var(--muted-foreground))]">Loading trainer applications…</div> : applicationsError ? <div className="p-8 text-center"><X className="mx-auto mb-3 text-[hsl(var(--accent))]" size={25} /><h3 className="font-bold">Applications could not load</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{applicationsError}</p></div> : approvals.length ? approvals.map((application) => <div key={application.id} className="flex flex-wrap items-center gap-3 p-4"><IconAvatar text={initials(application.name)} size="sm" tone="sand" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2 text-xs font-bold"><span>{application.name}</span><span className={`pill ${statusPillClass(application.status)}`}>{statusLabel(application.status)}</span></div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{application.email} · {application.location || 'Location not provided'}</div><div className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">Applied {new Date(application.createdAt).toLocaleDateString()}</div></div><div className="flex flex-wrap gap-2">{application.status === 'PENDING' && <><button data-testid={`button-approve-${application.id}`} disabled={updatingId === application.id} className="btn btn-primary px-3 py-2" onClick={() => void changeStatus(application, 'APPROVED')}><Check size={13} /> Approve</button><button data-testid={`button-reject-${application.id}`} disabled={updatingId === application.id} className="btn btn-outline px-3 py-2" onClick={() => void changeStatus(application, 'REJECTED')}><X size={13} /> Reject</button></>}{application.status === 'APPROVED' && <button data-testid={`button-suspend-${application.id}`} disabled={updatingId === application.id} className="btn btn-outline px-3 py-2" onClick={() => void changeStatus(application, 'SUSPENDED')}><ShieldCheck size={13} /> Suspend</button>}{application.status === 'SUSPENDED' && <button data-testid={`button-restore-${application.id}`} disabled={updatingId === application.id} className="btn btn-primary px-3 py-2" onClick={() => void changeStatus(application, 'APPROVED')}><Check size={13} /> Restore</button>}{application.status === 'REJECTED' && <button data-testid={`button-reapprove-${application.id}`} disabled={updatingId === application.id} className="btn btn-primary px-3 py-2" onClick={() => void changeStatus(application, 'APPROVED')}><Check size={13} /> Approve</button>}</div></div>) : <div className="p-8 text-center"><CheckCircle2 className="mx-auto mb-3 text-[hsl(var(--primary))]" size={25} /><h3 className="font-bold">No trainer applications yet</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">New trainer applications will appear here for review.</p></div>}</div></section>
       <section className="animate-rise stagger-2"><SectionHeading eyebrow="Organizational pulse" title="Platform analytics" action={<button className="btn btn-quiet" onClick={() => toast('Analytics export prepared for download.')}>Export report <ArrowRight size={13} /></button>} /><div className="card-surface p-5"><div className="mb-6 flex items-center justify-between"><div><div className="text-sm font-bold">Learning participation</div><div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Active learners across all programs</div></div><span className="metric-number text-[hsl(var(--primary))]">82%</span></div><ProgressBar value={82} /><div className="mt-7 grid grid-cols-3 gap-3">{[['Pass rate', '78%'], ['Active trainers', '438'], ['New content', '24']].map(([label, value]) => <div key={label} className="rounded-xl bg-[hsl(var(--secondary)/.62)] p-4"><div className="mono text-lg font-bold">{value}</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{label}</div></div>)}</div><div className="mt-6 flex items-end gap-2 border-b border-[hsl(var(--border))] pb-1">{[42, 61, 55, 72, 68, 84, 82, 91, 82].map((height, index) => <div key={`${height}-${index}`} className="chart-bar flex-1" style={{ height: `${height * .55}px`, opacity: index === 8 ? 1 : .45 + index * .05 }} />)}</div><div className="mt-2 flex justify-between text-[10px] text-[hsl(var(--muted-foreground))]"><span>Jan</span><span>Sep 2026</span></div></div></section>
     </div>
     <section className="mt-8 card-surface animate-rise stagger-3 p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]"><Target size={19} /></div><div><div className="eyebrow">Standout system</div><h2 className="mt-1 text-lg font-bold">Competency mapping is ready for review</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Match trainers to organizational needs with explainable scoring.</p></div></div><Link href="/competencies" className="btn btn-outline">Open competency map <ArrowRight size={14} /></Link></div></section>
@@ -556,11 +581,9 @@ function AppProvider({ children }: { children: ReactNode }) {
   const [posts, setPosts] = useState(initialPosts);
   const [following, setFollowing] = useState<string[]>([]);
   const [notices, setNotices] = useState(initialNotices);
-  const [approvals, setApprovals] = useState([
-    { id: 1, name: 'Meera Kapoor', role: 'Trainer', detail: 'Data & analytics · New applicant', initials: 'MK' },
-    { id: 2, name: 'Daniel Mensah', role: 'Trainee', detail: 'Product operations · Accra', initials: 'DM' },
-    { id: 3, name: 'Sofia Chen', role: 'Trainer', detail: 'Leadership & coaching · Singapore', initials: 'SC' },
-  ]);
+  const [approvals, setApprovals] = useState<TrainerApplication[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
+  const [applicationsError, setApplicationsError] = useState('');
   const [profile, setProfile] = useState({ name: 'Amina Mensah', role: 'Product operations trainee', location: 'Accra, Ghana', bio: 'I make the messy middle of product work a little clearer. Currently learning in public and collecting better questions.', skills: ['Product thinking', 'Communication', 'Research'] });
   const [toastMessage, setToastMessage] = useState('');
   useEffect(() => {
@@ -569,6 +592,22 @@ function AppProvider({ children }: { children: ReactNode }) {
       .catch(() => setUser(null))
       .finally(() => setAuthLoading(false));
   }, []);
+  useEffect(() => {
+    if (user?.role !== 'ADMIN') {
+      setApprovals([]);
+      setApplicationsError('');
+      setApplicationsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setApplicationsLoading(true);
+    setApplicationsError('');
+    void authRequest<{ applications: TrainerApplication[] }>('/auth/admin/trainer-applications')
+      .then((result) => { if (!cancelled) setApprovals(result.applications); })
+      .catch((error) => { if (!cancelled) setApplicationsError(error instanceof Error ? error.message : 'Trainer applications are temporarily unavailable.'); })
+      .finally(() => { if (!cancelled) setApplicationsLoading(false); });
+    return () => { cancelled = true; };
+  }, [user?.id, user?.role]);
   useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); localStorage.setItem('prolearn-theme', theme); }, [theme]);
   useEffect(() => { document.documentElement.classList.toggle('reduced-motion', accessibilityMode); localStorage.setItem('capacity-connect-accessibility', accessibilityMode ? 'on' : 'off'); }, [accessibilityMode]);
   const signIn = async (email: string, password: string, admin = false) => {
@@ -579,6 +618,11 @@ function AppProvider({ children }: { children: ReactNode }) {
   };
   const signUp = (values: { email: string; password: string; name: string; role: Exclude<Role, 'ADMIN'> }) => authRequest<{ message: string; needsEmailVerification?: boolean; status?: AccountStatus }>('/auth/signup', { method: 'POST', body: JSON.stringify(values) });
   const signOut = async () => { await authRequest<void>('/auth/logout', { method: 'POST' }).catch(() => undefined); setUser(null); };
+  const updateApplicationStatus = async (id: string, status: AccountStatus) => {
+    const result = await authRequest<{ application: TrainerApplication }>(`/auth/admin/trainer-applications/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    setApprovals((current) => current.map((application) => application.id === id ? result.application : application));
+    return result.application;
+  };
   const role = user?.role ?? 'TRAINEE';
   const value: AppContextValue = {
     theme, toggleTheme: () => setTheme((current) => current === 'dark' ? 'light' : 'dark'),
@@ -595,7 +639,7 @@ function AppProvider({ children }: { children: ReactNode }) {
     follow: (name) => setFollowing((current) => current.includes(name) ? current.filter((item) => item !== name) : [...current, name]),
     following, publish: (body) => setPosts((current) => [{ id: Date.now(), name: profile.name, role: profile.role, initials: initials(profile.name), time: 'Just now', body, tags: ['#learning-in-public'], likes: 0, comments: 0 }, ...current]),
     notices, markRead: (id) => setNotices((current) => current.map((notice) => notice.id === id ? { ...notice, read: true } : notice)), markAllRead: () => setNotices((current) => current.map((notice) => ({ ...notice, read: true }))),
-    approvals, approveUser: (id) => setApprovals((current) => current.filter((person) => person.id !== id)),
+    approvals, applicationsLoading, applicationsError, updateApplicationStatus,
     profile, updateProfile: setProfile, toast: (message) => { setToastMessage(message); window.setTimeout(() => setToastMessage(''), 2800); },
   };
   return <AppContext.Provider value={value}>{children}{toastMessage && <NoticeToast message={toastMessage} close={() => setToastMessage('')} />}</AppContext.Provider>;

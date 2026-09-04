@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, profiles } from "@workspace/db";
 import {
   authenticateWithPassword,
@@ -7,15 +7,30 @@ import {
   getAuthenticatedProfile,
   isAllowedStatus,
   profilePayload,
+  requireAdminProfile,
   setSessionCookie,
 } from "../lib/auth";
 import { getSupabaseError, supabaseRequest } from "../lib/supabase";
 
 const router: IRouter = Router();
 const publicRoles = ["TRAINEE", "TRAINER"] as const;
+const accountStatuses = ["PENDING", "APPROVED", "REJECTED", "SUSPENDED"] as const;
+type ManagedAccountStatus = (typeof accountStatuses)[number];
 
 function isPublicRole(value: unknown): value is (typeof publicRoles)[number] {
   return publicRoles.includes(value as (typeof publicRoles)[number]);
+}
+
+function isManagedAccountStatus(value: unknown): value is ManagedAccountStatus {
+  return accountStatuses.includes(value as ManagedAccountStatus);
+}
+
+function trainerApplicationPayload(profile: typeof profiles.$inferSelect) {
+  return {
+    ...profilePayload(profile),
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  };
 }
 
 router.post("/auth/signup", async (req, res) => {
@@ -107,6 +122,59 @@ router.post("/auth/login", (req, res) => void login(req, res));
 router.post("/auth/admin/login", (req, res) => {
   req.body = { ...req.body, expectedRole: "ADMIN" };
   void login(req, res);
+});
+
+router.get("/auth/admin/trainer-applications", async (req, res) => {
+  try {
+    const admin = await requireAdminProfile(req, res);
+    if (!admin) return;
+
+    const applications = await db
+      .select()
+      .from(profiles)
+      .where(eq(profiles.role, "TRAINER"))
+      .orderBy(desc(profiles.createdAt));
+
+    res.json({ applications: applications.map(trainerApplicationPayload) });
+  } catch (error) {
+    req.log.error({ err: error }, "Trainer applications lookup failed");
+    res.status(500).json({ message: "Trainer applications are temporarily unavailable." });
+  }
+});
+
+router.patch("/auth/admin/trainer-applications/:id/status", async (req, res) => {
+  try {
+    const admin = await requireAdminProfile(req, res);
+    if (!admin) return;
+
+    const { id } = req.params;
+    const { status } = req.body as { status?: unknown };
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      res.status(400).json({ message: "That trainer application id is invalid." });
+      return;
+    }
+    if (!isManagedAccountStatus(status)) {
+      res.status(400).json({ message: "Choose a valid account status." });
+      return;
+    }
+
+    const [updatedProfile] = await db
+      .update(profiles)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(profiles.id, id), eq(profiles.role, "TRAINER")))
+      .returning();
+
+    if (!updatedProfile) {
+      res.status(404).json({ message: "Trainer application not found." });
+      return;
+    }
+
+    req.log.info({ trainerId: id, status }, "Trainer application status changed");
+    res.json({ application: trainerApplicationPayload(updatedProfile) });
+  } catch (error) {
+    req.log.error({ err: error }, "Trainer application status change failed");
+    res.status(500).json({ message: "We could not update that trainer application." });
+  }
 });
 
 router.get("/auth/me", async (req, res) => {

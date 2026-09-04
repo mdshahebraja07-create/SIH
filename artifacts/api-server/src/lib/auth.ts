@@ -133,6 +133,24 @@ export async function getAuthenticatedProfile(req: Request, res: Response): Prom
   return profile;
 }
 
+export async function requireAdminProfile(req: Request, res: Response): Promise<Profile | null> {
+  const profile = await getAuthenticatedProfile(req, res);
+  if (!profile) {
+    res.status(401).json({ message: "Sign in required." });
+    return null;
+  }
+  if (!isAllowedStatus(profile.status)) {
+    clearSessionCookie(res);
+    res.status(401).json({ message: "Your account is not active." });
+    return null;
+  }
+  if (profile.role !== "ADMIN") {
+    res.status(403).json({ message: "Administrator access is required." });
+    return null;
+  }
+  return profile;
+}
+
 export function profilePayload(profile: Profile) {
   return {
     id: profile.id,
