@@ -1,0 +1,924 @@
+You are the senior full-stack engineer responsible for completing and stabilizing my existing project: Capacity Connect.
+
+IMPORTANT:
+Do NOT create a new project.
+Do NOT replace the existing application unnecessarily.
+Do NOT remove working features.
+First inspect the existing codebase and then improve it systematically.
+
+The goal is to make the current Capacity Connect application fully functional, secure, responsive, and ready for a serious hackathon/demo.
+
+==================================================
+
+1. PROJECT PURPOSE
+   ==================================================
+
+Capacity Connect is an EdTech, training, competency-management, and organizational capacity-building platform.
+
+It connects:
+
+1. Trainees
+2. Trainers
+3. Administrators
+
+The platform should help organizations identify competency gaps, provide training, measure learning progress, connect trainees with suitable trainers, and monitor organizational learning capacity.
+
+==================================================
+2. REQUIRED USER ROLES
+
+Exactly three roles:
+
+TRAINEE
+TRAINER
+ADMIN
+
+Use ONE Supabase authentication system.
+
+Normal user authentication:
+
+/login
+/signup
+
+Admin authentication:
+
+/admin/login
+
+Public signup must allow only:
+
+TRAINEE
+TRAINER
+
+Never allow a public user to create an ADMIN account.
+
+After successful authentication:
+
+TRAINEE → /trainee/dashboard
+TRAINER → /trainer/dashboard
+ADMIN → /admin/dashboard
+
+Role authorization must be enforced server-side.
+
+Do NOT rely only on hiding buttons or frontend route checks.
+
+A trainee must not be able to access trainer/admin pages by manually entering URLs.
+
+A trainer must not be able to access admin pages.
+
+A non-admin must never be able to access admin functionality.
+
+==================================================
+3. ADMIN MUST BE COMPLETE
+
+Create/fix the complete Admin module.
+
+Admin navigation:
+
+Dashboard
+Users
+Approvals
+Trainees
+Trainers
+Courses
+Assessments
+Certifications
+Competencies
+Announcements
+Achievements
+Learning Content
+Analytics
+Activity Logs
+Settings
+
+Admin dashboard must use REAL database data.
+
+Display:
+
+Total Users
+Total Trainees
+Total Trainers
+Pending Approvals
+Total Courses
+Published Courses
+Total Enrollments
+Assessment Attempts
+Certificates Issued
+Completion Rate
+Participation Rate
+
+Do not use fake or hardcoded values when database data is available.
+
+Admin capabilities:
+
+- approve users
+- reject users
+- suspend users
+- reactivate users
+- view users
+- search users
+- filter users
+- manage trainees
+- manage trainers
+- manage courses
+- monitor assessments
+- monitor certificates
+- manage competencies
+- publish announcements
+- publish achievements
+- publish new learning content
+- view analytics
+- view activity/audit logs
+
+Protect critical admin operations with server-side authorization.
+
+Do not allow an admin to accidentally remove or disable the last valid administrator.
+
+==================================================
+4. TRAINEE MODULE
+
+Trainee dashboard must include:
+
+- profile
+- enrolled courses
+- course progress
+- completed courses
+- upcoming assessments
+- assessment results
+- certificates
+- learning resources
+- study activity
+- current streak
+- competency gaps
+- recommended courses
+- personalized learning path
+- notifications
+
+Profile should support:
+
+Full Name
+Photo
+Headline
+Bio
+Qualifications
+Work Experience
+Interests
+Skills
+Certificates
+Career Goals
+Location
+LinkedIn URL
+
+Trainees should be able to:
+
+- browse courses
+- search courses
+- filter courses
+- view course details
+- enroll in courses
+- continue learning
+- access authorized learning content
+- complete lessons
+- attempt MCQ assessments
+- see results
+- give course/resource feedback
+- track progress
+- view certificates
+
+==================================================
+5. FIX TRAINEE STUDIES / STREAK BUG
+
+There is currently an error where the Trainee Studies section shows incorrect streak days.
+
+Do NOT simply change the displayed number.
+
+Find the actual source of the bug.
+
+Use real learning activity to calculate the streak.
+
+Qualifying activities may include:
+
+- meaningful learning resource access
+- lesson completion
+- meaningful course progress
+- assessment completion
+
+Do NOT count simple page refreshes as new study days.
+
+Do NOT create duplicate activity records for repeated refreshes.
+
+Create a learning activity system if necessary.
+
+Possible structure:
+
+learning_activity
+
+id
+user_id
+activity_date
+activity_type
+entity_type
+entity_id
+created_at
+
+Ensure one user's repeated activity on the same day does not incorrectly increase the streak.
+
+Use a consistent timezone strategy.
+
+Example:
+
+Activity on Sept 1, Sept 2, Sept 3
+→ streak = 3
+
+Activity only on Sept 1 and Sept 3
+→ streak on Sept 3 = 1
+
+The displayed streak must always come from database activity.
+
+Remove any hardcoded/demo streak values.
+
+Also audit:
+
+study days
+course progress
+completion percentage
+assessment statistics
+completed courses
+average scores
+
+All must come from real data.
+
+==================================================
+6. TRAINER MODULE
+
+Trainer navigation:
+
+Dashboard
+My Profile
+My Courses
+Questionnaires
+Trainees
+Performance
+Library
+Notifications
+
+Trainer profile:
+
+Name
+Photo
+Bio
+Designation
+Organization
+Experience
+Qualifications
+Specialization
+Subjects
+Skills
+Availability
+Certifications
+
+Trainer capabilities:
+
+- create courses
+- edit courses
+- publish courses
+- unpublish courses
+- create questionnaires
+- set deadlines
+- create MCQ assessments
+- monitor trainee participation
+- monitor performance
+- view course enrollments
+- upload learning resources
+
+==================================================
+7. TRAINER VIDEO / CONTENT UPLOAD
+
+There must be a clearly visible:
+
+TRAINER → LIBRARY → UPLOAD CONTENT
+
+Create:
+
+/trainer/library
+
+Show:
+
++ Upload Learning Content
+
+Upload form:
+
+Title
+Description
+Course
+Content Type
+File
+Visibility
+
+Supported content:
+
+VIDEO
+PDF
+PRESENTATION
+DOCUMENT
+LINK
+
+For VIDEO:
+
+- show file name
+- show file size
+- show upload progress
+- show percentage
+- show success state
+- show failure state
+- allow retry
+- allow delete
+- allow metadata editing
+
+Store actual files in Supabase Storage.
+
+Do NOT store video binary data in PostgreSQL.
+
+Use a PRIVATE learning-content bucket.
+
+Use Supabase Storage RLS policies.
+
+Only authorized trainers can upload/manage their own resources.
+
+Only authorized trainees can access resources they are entitled to access.
+
+For large videos, use resumable uploads where appropriate.
+
+Never expose a Supabase secret/service-role key in browser code.
+
+==================================================
+8. COURSE SYSTEM
+
+Courses need:
+
+Title
+Description
+Category
+Level
+Trainer
+Duration
+Thumbnail
+Status
+Created Date
+
+Statuses:
+
+DRAFT
+PUBLISHED
+ARCHIVED
+
+Trainees:
+
+- browse
+- search
+- filter
+- view
+- enroll
+- learn
+- track progress
+- complete
+
+Trainers:
+
+- create
+- edit
+- manage
+- publish
+- add resources
+- add assessments
+- monitor trainees
+
+Admins:
+
+- manage/monitor courses
+
+==================================================
+9. ASSESSMENT SYSTEM
+
+Implement subject-wise MCQ assessments.
+
+Trainer can:
+
+- create assessment
+- add questions
+- add options
+- define correct answer
+- set marks
+- set duration
+- set deadline
+- publish assessment
+
+Trainee can:
+
+- start assessment
+- answer questions
+- use timer
+- submit
+- see result
+- receive permitted feedback
+
+SECURITY:
+
+Never send correct answers to the browser before submission.
+
+Evaluate answers securely on the server.
+
+Prevent client-side score manipulation.
+
+==================================================
+10. COMPETENCY GAP ANALYSIS
+
+Implement:
+
+Competencies
+Trainee competency
+Trainer competency
+Course competency
+
+Example:
+
+Python:
+Current Level = 2
+Required Level = 4
+Gap = 2
+
+Display competency gaps clearly.
+
+Recommend suitable courses based on gaps.
+
+==================================================
+11. TRAINER MATCHING
+
+Implement explainable trainer matching.
+
+Suggested scoring:
+
+Skill Match = 40%
+Qualification = 20%
+Experience = 20%
+Certification = 10%
+Past Performance = 10%
+
+Example:
+
+Trainer A
+92%
+
+Reasons:
+
+- Python expertise
+- Machine Learning expertise
+- relevant qualification
+- 6 years experience
+- strong trainee feedback
+
+Do not falsely claim AI unless an actual AI model is implemented.
+
+==================================================
+12. PERSONALIZED LEARNING PATH
+
+Use:
+
+Trainee skills
+Career goals
+Competency gaps
+Course requirements
+Assessment performance
+
+to generate a recommended learning path.
+
+Example:
+
+Current Skill
+↓
+Gap
+↓
+Recommended Course
+↓
+Assessment
+↓
+Improvement
+↓
+Next Skill
+
+==================================================
+13. CERTIFICATES
+
+Implement digital certificates.
+
+Certificate should include:
+
+Trainee Name
+Course
+Completion Date
+Certificate ID
+Issuing Organization
+Verification Status
+
+Create:
+
+/verify/[certificateId]
+
+Do not expose unnecessary personal information.
+
+==================================================
+14. ANNOUNCEMENTS / HOMEPAGE
+
+Admin can publish:
+
+Announcements
+Notifications
+Achievements
+New Learning Content
+
+Homepage should dynamically display active published content.
+
+Do not use fake news or fake achievements.
+
+==================================================
+15. DATABASE / SUPABASE
+
+Use Supabase PostgreSQL.
+
+Core tables should include as required:
+
+profiles
+trainee_profiles
+trainer_profiles
+courses
+course_enrollments
+course_resources
+assessments
+questions
+question_options
+assessment_attempts
+assessment_answers
+trainer_library
+certificates
+feedback
+questionnaires
+questionnaire_responses
+competencies
+trainer_competencies
+course_competencies
+notifications
+announcements
+achievements
+learning_activity
+activity_logs
+
+Inspect the existing database first.
+
+Do not create duplicate tables unnecessarily.
+
+Use foreign keys, constraints, indexes, timestamps, and appropriate cascading behavior.
+
+==================================================
+16. AUTHENTICATION
+
+Use Supabase Auth.
+
+Use secure password authentication.
+
+Support email verification.
+
+Handle:
+
+login
+signup
+logout
+session restoration
+forgot password
+password reset
+session expiry
+
+Account statuses:
+
+PENDING
+APPROVED
+REJECTED
+SUSPENDED
+
+If approval is required:
+
+Signup
+↓
+Email verification
+↓
+PENDING
+↓
+Admin approval
+↓
+APPROVED
+↓
+Dashboard access
+
+==================================================
+17. RLS SECURITY
+
+Enable Row Level Security on all exposed tables.
+
+Create precise RLS policies.
+
+Examples:
+
+Trainee:
+
+- can read/update own profile
+- can access authorized courses/resources
+- can access own enrollment data
+- can access own assessments/results
+- can access own certificates
+
+Trainer:
+
+- can manage own profile
+- can manage own courses
+- can manage own learning resources
+- can view authorized trainee performance related to their courses
+
+Admin:
+
+- can perform authorized administrative operations
+
+Never trust role information supplied by the client.
+
+Never rely only on frontend authorization.
+
+Protect against:
+
+cross-user data access
+cross-role access
+URL manipulation
+API manipulation
+unauthorized updates
+unauthorized file downloads
+
+==================================================
+18. FILE STORAGE SECURITY
+
+Use Supabase Storage.
+
+Private storage where content requires authorization.
+
+Validate:
+
+file type
+file size
+ownership
+course access
+user role
+
+Do not expose privileged storage credentials.
+
+Do not make protected training videos publicly accessible merely to simplify playback.
+
+==================================================
+19. UI / UX
+
+Keep the current Capacity Connect visual identity if it is already good.
+
+Make the application:
+
+- professional
+- modern
+- clean
+- responsive
+- mobile friendly
+- accessible
+- fast
+- consistent
+
+Every button must work.
+
+Every navigation item must lead to a real page.
+
+No dead buttons.
+
+No fake statistics.
+
+No unnecessary animations.
+
+Provide:
+
+loading states
+skeleton states
+empty states
+error states
+success messages
+confirmation dialogs
+upload progress
+
+==================================================
+20. SEARCH
+
+Implement useful search where appropriate:
+
+courses
+trainers
+trainees for authorized trainers/admins
+learning resources
+users for admins
+
+Add filters.
+
+==================================================
+21. NOTIFICATIONS
+
+Support useful notifications:
+
+course enrollment
+assessment deadline
+assessment result
+certificate issued
+new course
+new learning content
+admin announcements
+approval/rejection status
+
+Avoid notification spam.
+
+==================================================
+22. AUDIT LOGS
+
+Record important administrative and security actions:
+
+login
+logout
+approval
+rejection
+suspension
+role changes
+course creation
+course publication
+resource upload
+resource deletion
+assessment creation
+certificate generation
+
+Store:
+
+user_id
+action
+entity_type
+entity_id
+metadata
+created_at
+
+==================================================
+23. ERROR HANDLING
+
+Fix all visible runtime errors.
+
+Handle:
+
+network failures
+database failures
+authentication failures
+upload failures
+invalid files
+permission failures
+expired sessions
+missing records
+
+Never expose database credentials or internal secrets in error messages.
+
+==================================================
+24. PERFORMANCE
+
+Optimize:
+
+database queries
+indexes
+large lists
+image loading
+video loading
+dashboard queries
+
+Use pagination where appropriate.
+
+Do not fetch entire large tables unnecessarily.
+
+==================================================
+25. MOBILE
+
+Test all major pages on mobile.
+
+Especially:
+
+login
+signup
+admin login
+trainee dashboard
+trainer dashboard
+admin dashboard
+course pages
+assessment page
+library/upload
+profile
+
+==================================================
+26. COMPLETE QA AUDIT
+
+After implementation, test the full application.
+
+Test:
+
+1. Trainee signup
+2. Trainer signup
+3. Admin login
+4. Normal user trying admin login
+5. Trainee attempting trainer route
+6. Trainee attempting admin route
+7. Trainer attempting admin route
+8. User approval
+9. User rejection
+10. User suspension
+11. Course creation
+12. Course enrollment
+13. Course progress
+14. Video upload
+15. PDF upload
+16. Large file upload
+17. Resource access
+18. Unauthorized resource access
+19. Assessment creation
+20. Assessment submission
+21. Correct score calculation
+22. Certificate generation
+23. Certificate verification
+24. Streak calculation
+25. Study activity
+26. Dashboard statistics
+27. Competency gap calculation
+28. Trainer matching
+29. Notifications
+30. Logout
+31. Password reset
+32. Session expiry
+33. RLS
+34. Storage RLS
+35. Mobile responsiveness
+
+==================================================
+27. MOST IMPORTANT RULE
+
+DO NOT blindly rewrite the entire application.
+
+First inspect the existing project.
+
+Then work in this order:
+
+AUDIT
+↓
+FIX DATABASE
+↓
+FIX AUTH
+↓
+FIX ROLE AUTHORIZATION
+↓
+FIX RLS
+↓
+FIX ADMIN
+↓
+FIX TRAINER LIBRARY/UPLOAD
+↓
+FIX TRAINEE STUDIES/STREAK
+↓
+FIX COURSES
+↓
+FIX ASSESSMENTS
+↓
+FIX COMPETENCY SYSTEM
+↓
+FIX CERTIFICATES
+↓
+FIX ANALYTICS
+↓
+FINAL SECURITY AUDIT
+↓
+FINAL UI/UX AUDIT
+↓
+FINAL TESTING
+
+After every major phase, report:
+
+1. What was changed
+2. Files changed
+3. Database changes
+4. Environment variables required
+5. Tests performed
+6. Remaining problems
+
+Do not declare the application complete if major requirements are still missing.
+
+The final application must feel like one coherent product called:
+
+CAPACITY CONNECT
+
+not a collection of unrelated demo pages.
+
+Prioritize correctness, security, real database functionality, and reliable calculations over flashy UI.

@@ -1,2 +1,4 @@
 - [Capacity Connect demo scope](capacity-connect-demo.md) — the current product story is intentionally demonstrable in frontend-local state; production persistence remains a separate scope.
 - [Supabase auth boundary](supabase-auth-boundary.md) — the connected Supabase project exposes Auth/PostgREST but not schema administration; keep permission state server-owned until RLS is provisioned.
+- [Post-merge database sync](post-merge-database-sync.md) — name existing Drizzle constraints explicitly and keep automatic schema setup non-interactive.
+- [Learning data vertical slice](learning-data-vertical-slice.md) — course progress and activity use server-owned rows, UTC dates, and duplicate-safe signals.

@@ -22,7 +22,7 @@ const queryClient = new QueryClient();
 type Course = {
   id: string; title: string; category: string; level: string; duration: string; lessons: number;
   progress: number; description: string; trainer: string; initials: string; color: string;
-  accent: string; enrolled?: boolean; skills: string[];
+  accent: string; enrolled?: boolean; skills: string[]; status?: string;
 };
 type Post = { id: number; name: string; role: string; initials: string; time: string; body: string; tags: string[]; likes: number; comments: number; liked?: boolean; };
 type Notice = { id: number; type: 'course' | 'network' | 'achievement' | 'assessment'; title: string; body: string; time: string; read: boolean; };
@@ -33,6 +33,13 @@ type AuthUser = {
   location: string; bio: string; skills: string[]; emailVerified: boolean;
 };
 type TrainerApplication = AuthUser & { createdAt: string; updatedAt: string };
+type LearningActivitySummary = {
+  id: string; action: string; title: string; date: string; durationMinutes: number;
+};
+type LearningSummary = {
+  streak: number; overallProgress: number; weeklyMinutes: number;
+  weeklyActivity: number[]; enrolledCourses: Course[]; activities: LearningActivitySummary[];
+};
 
 const courses: Course[] = [
   { id: 'product-storytelling', title: 'Product storytelling for people who build', category: 'Communication', level: 'Intermediate', duration: '4h 20m', lessons: 12, progress: 68, description: 'Make complex work easy to understand, memorable to champion, and impossible to overlook.', trainer: 'Maya Okafor', initials: 'MO', color: '#174f4d', accent: '#f28d72', skills: ['Narrative design', 'Presenting', 'Stakeholder influence'] },
@@ -100,8 +107,9 @@ type AppContextValue = {
   role: Role; signIn: (email: string, password: string, admin?: boolean) => Promise<AuthUser>;
   signUp: (values: { email: string; password: string; name: string; role: Exclude<Role, 'ADMIN'> }) => Promise<{ message: string; needsEmailVerification?: boolean; status?: AccountStatus }>;
   signOut: () => Promise<void>;
+  courseCatalog: Course[]; learningSummary: LearningSummary; learningLoading: boolean;
   globalSearch: string; setGlobalSearch: (value: string) => void;
-  enrolled: string[]; enroll: (id: string) => void; advance: (id: string) => void; progressFor: (id: string) => number;
+  enrolled: string[]; enroll: (id: string) => Promise<void>; advance: (id: string) => Promise<void>; progressFor: (id: string) => number;
   posts: Post[]; react: (id: number) => void; follow: (name: string) => void; following: string[];
   publish: (body: string) => void;
   notices: Notice[]; markRead: (id: number) => void; markAllRead: () => void;
@@ -177,7 +185,7 @@ function AuthScreen() {
         if (!result.needsEmailVerification && result.status === 'APPROVED') setLocation('/login');
       } else {
         const user = await signIn(email, password, isAdmin);
-        setLocation(user.role === 'ADMIN' ? '/admin' : user.role === 'TRAINER' ? '/trainer' : '/');
+        setLocation(user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'TRAINER' ? '/trainer/dashboard' : '/trainee/dashboard');
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Please check your details and try again.');
@@ -220,7 +228,7 @@ function Shell({ children }: { children: ReactNode }) {
   const { notices, profile, role, user, globalSearch, setGlobalSearch, toast } = useApp();
   const nav = role === 'TRAINER'
     ? [
-      { href: '/', label: 'Dashboard', icon: HomeIcon },
+      { href: '/trainer/dashboard', label: 'Dashboard', icon: HomeIcon },
       { href: '/learning', label: 'Courses', icon: BookOpen },
       { href: '/trainer', label: 'Trainer hub', icon: GraduationCap },
        { href: '/sessions', label: 'Live sessions', icon: Clock3 },
@@ -228,14 +236,14 @@ function Shell({ children }: { children: ReactNode }) {
     ]
     : role === 'ADMIN'
       ? [
-        { href: '/', label: 'Dashboard', icon: HomeIcon },
+        { href: '/admin/dashboard', label: 'Dashboard', icon: HomeIcon },
         { href: '/admin', label: 'Control center', icon: ShieldCheck },
         { href: '/insights', label: 'Capacity reports', icon: BarChart3 },
         { href: '/competencies', label: 'Competencies', icon: Target },
         { href: '/learning', label: 'Courses', icon: BookOpen },
       ]
       : [
-        { href: '/', label: 'Home', icon: HomeIcon },
+        { href: '/trainee/dashboard', label: 'Home', icon: HomeIcon },
          { href: '/path', label: 'My path', icon: Target },
         { href: '/learning', label: 'Learning', icon: BookOpen },
         { href: '/network', label: 'Network', icon: Users },
@@ -275,20 +283,23 @@ function Shell({ children }: { children: ReactNode }) {
 }
 
 function TraineeHome() {
-  const { profile, enrolled, advance, progressFor, toast } = useApp();
+  const { profile, courseCatalog, learningSummary, learningLoading, advance, progressFor, toast } = useApp();
   const [assessment, setAssessment] = useState(false);
-  const activeBase = courses.find((course) => course.id === (enrolled[0] || 'product-storytelling')) || courses[0];
+  const activeBase = courseCatalog.find((course) => course.enrolled) || courseCatalog[0];
+  if (learningLoading && !activeBase) return <div className="content-wrap"><div className="card-surface p-8 text-sm text-[hsl(var(--muted-foreground))]">Loading your learning workspace…</div></div>;
+  if (!activeBase) return <div className="content-wrap"><div className="card-surface p-8"><div className="eyebrow mb-3">Your learning shelf</div><h1 className="text-2xl font-bold">Your first path starts here.</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Explore the learning library to choose a course and begin building your proof.</p><Link href="/learning" className="btn btn-primary mt-5">Explore learning <ArrowRight size={14} /></Link></div></div>;
   const active = { ...activeBase, progress: progressFor(activeBase.id) };
-  const totalProgress = 61;
-  const activities: { action: string; title: string; time: string; Icon: LucideIcon }[] = [
-    { action: 'Completed', title: 'The anatomy of a useful brief', time: 'Today, 9:42 AM', Icon: Award },
-    { action: 'Shared', title: 'A note on making trade-offs visible', time: 'Yesterday, 4:18 PM', Icon: Share2 },
-    { action: 'Joined', title: 'Product storytelling for people who build', time: 'Mon, 11:06 AM', Icon: BookOpen },
-  ];
+  const totalProgress = learningSummary.overallProgress;
+  const activities: { action: string; title: string; time: string; Icon: LucideIcon }[] = learningSummary.activities.map((activity) => ({
+    action: activity.action,
+    title: courseCatalog.find((course) => course.id === activity.title)?.title || activity.title,
+    time: activity.date,
+    Icon: activity.action === 'Completed' ? Award : activity.action === 'Progressed' ? TrendingUp : BookOpen,
+  }));
   return <div className="content-wrap">
     <div className="mb-9 flex animate-rise items-end justify-between gap-5">
       <div><div className="eyebrow mb-3">Your next chapter</div><h1 data-testid="text-home-heading" className="display-title">Good morning, {profile.name.split(' ')[0]}<span className="text-[hsl(var(--accent))]">.</span></h1><p className="mt-3 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">A little progress today gives your future self more to work with.</p></div>
-      <div className="hidden items-center gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-xs font-semibold md:flex"><Flame size={15} className="text-[hsl(var(--accent))]" /> 5 day streak <span className="text-[hsl(var(--muted-foreground))]">·</span> keep it going</div>
+       <div className="hidden items-center gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-xs font-semibold md:flex"><Flame size={15} className="text-[hsl(var(--accent))]" /> {learningSummary.streak} day streak <span className="text-[hsl(var(--muted-foreground))]">·</span> keep it going</div>
     </div>
     <div className="grid animate-rise gap-5 lg:grid-cols-[1.42fr_.78fr]">
       <section className="card-surface relative overflow-hidden bg-[hsl(var(--sidebar))] p-6 text-[hsl(var(--sidebar-foreground))] sm:p-8">
@@ -296,16 +307,16 @@ function TraineeHome() {
         <div className="relative"><div className="mb-8 flex items-center justify-between"><span className="eyebrow text-[hsl(var(--sidebar-primary))]">In progress</span><span className="pill bg-[hsl(var(--sidebar-accent))] text-[hsl(var(--sidebar-foreground)/.75)]">{active.category}</span></div><div className="max-w-lg"><h2 className="serif text-4xl leading-[.95] tracking-[-.03em] sm:text-5xl">{active.title}</h2><p className="mt-4 max-w-md text-sm leading-6 text-[hsl(var(--sidebar-foreground)/.62)]">{active.description}</p></div><div className="mt-9 flex items-end justify-between gap-5"><div className="w-48"><div className="mb-2 flex justify-between text-[10px] font-bold uppercase tracking-[.1em] text-[hsl(var(--sidebar-foreground)/.58)]"><span>{active.progress}% complete</span><span>{active.duration}</span></div><ProgressBar value={active.progress} /></div><Link href={`/course/${active.id}`} data-testid="link-continue-course" className="btn bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]">Continue <ArrowRight size={14} /></Link></div></div>
       </section>
       <section className="card-surface animate-rise stagger-1 flex flex-col justify-between p-6">
-        <div><div className="mb-7 flex items-center justify-between"><span className="eyebrow">Your rhythm</span><TrendingUp size={17} className="text-[hsl(var(--primary))]" /></div><div className="flex items-end gap-3"><span data-testid="text-overall-progress" className="metric-number">61%</span><span className="mb-1 text-xs text-[hsl(var(--muted-foreground))]">pathway complete</span></div><div className="mt-3"><ProgressBar value={61} color="coral" /></div></div>
-        <div className="mt-7 grid grid-cols-7 items-end gap-1.5 border-b border-[hsl(var(--border))] pb-1 pt-4">{[32, 48, 40, 78, 54, 88, 68].map((height, index) => <div key={height} className="flex flex-col items-center gap-1.5"><div className={`chart-bar w-full ${index === 6 ? 'bg-[hsl(var(--accent))]' : ''}`} style={{ height: `${height * .45}px` }} /><span className="mono text-[8px] text-[hsl(var(--muted-foreground))]">{['M', 'T', 'W', 'T', 'F', 'S', 'S'][index]}</span></div>)}</div>
-        <div className="mt-5 flex items-center gap-2 text-xs font-semibold"><Zap size={14} className="text-[hsl(var(--accent))]" /> 4h 10m learned this week</div>
+         <div><div className="mb-7 flex items-center justify-between"><span className="eyebrow">Your rhythm</span><TrendingUp size={17} className="text-[hsl(var(--primary))]" /></div><div className="flex items-end gap-3"><span data-testid="text-overall-progress" className="metric-number">{totalProgress}%</span><span className="mb-1 text-xs text-[hsl(var(--muted-foreground))]">pathway complete</span></div><div className="mt-3"><ProgressBar value={totalProgress} color="coral" /></div></div>
+         <div className="mt-7 grid grid-cols-7 items-end gap-1.5 border-b border-[hsl(var(--border))] pb-1 pt-4">{learningSummary.weeklyActivity.map((minutes, index) => <div key={index} className="flex flex-col items-center gap-1.5"><div className={`chart-bar w-full ${index === 6 ? 'bg-[hsl(var(--accent))]' : ''}`} style={{ height: `${Math.max(minutes ? minutes * .45 : 4, 4)}px` }} /><span className="mono text-[8px] text-[hsl(var(--muted-foreground))]">{['M', 'T', 'W', 'T', 'F', 'S', 'S'][index]}</span></div>)}</div>
+         <div className="mt-5 flex items-center gap-2 text-xs font-semibold"><Zap size={14} className="text-[hsl(var(--accent))]" /> {Math.floor(learningSummary.weeklyMinutes / 60)}h {learningSummary.weeklyMinutes % 60}m learned this week</div>
       </section>
     </div>
     <div className="mt-10 grid gap-8 lg:grid-cols-[1.42fr_.78fr]">
-      <section className="animate-rise stagger-2"><SectionHeading eyebrow="Pick up where you left off" title="Your learning shelf" action={<Link href="/learning" data-testid="link-all-learning" className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Explore all <ArrowRight size={13} /></Link>} /><div className="grid gap-4 sm:grid-cols-2">{courses.slice(0, 2).map((course) => <CourseMini key={course.id} course={course} onContinue={() => { advance(course.id); toast('Progress saved — nice work.'); }} />)}</div></section>
+       <section className="animate-rise stagger-2"><SectionHeading eyebrow="Pick up where you left off" title="Your learning shelf" action={<Link href="/learning" data-testid="link-all-learning" className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Explore all <ArrowRight size={13} /></Link>} /><div className="grid gap-4 sm:grid-cols-2">{courseCatalog.filter((course) => course.enrolled).slice(0, 2).map((course) => <CourseMini key={course.id} course={course} onContinue={() => { void advance(course.id).then(() => toast('Progress saved — nice work.')); }} />)}</div></section>
       <section className="animate-rise stagger-3"><SectionHeading eyebrow="Make it count" title="Next up" /><div className="card-surface overflow-hidden"><div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--accent)/.13)] p-5"><div className="mb-4 flex items-center justify-between"><span className="pill pill-coral">Assessment</span><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">12 min</span></div><h3 className="text-[17px] font-bold tracking-[-.03em]">Storytelling checkpoint</h3><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Three questions to turn the last module into usable proof.</p></div><div className="p-5"><div className="mb-4 flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]"><Clock3 size={14} /> Due tomorrow · Product storytelling</div><button data-testid="button-start-assessment" className="btn btn-primary w-full" onClick={() => setAssessment(true)}>Start assessment <ArrowRight size={14} /></button></div></div></section>
     </div>
-    <section className="mt-10 animate-rise stagger-3"><SectionHeading eyebrow="Your footprint" title="Recent activity" action={<Link href="/network" data-testid="link-see-network" className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Open network <ArrowRight size={13} /></Link>} /><div className="card-surface divide-y divide-[hsl(var(--border))]">{activities.map(({ action, title, time, Icon: ActivityIcon }, index) => <div key={title} className="flex items-center gap-4 p-4 sm:p-5"><div className={`grid h-9 w-9 place-items-center rounded-lg ${index === 0 ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]'}`}><ActivityIcon size={16} /></div><div className="min-w-0 flex-1"><div className="text-xs text-[hsl(var(--muted-foreground))]">{action}</div><div data-testid={`text-activity-${index}`} className="truncate text-sm font-semibold">{title}</div></div><span className="hidden text-[11px] text-[hsl(var(--muted-foreground))] sm:block">{time}</span><ChevronDown size={14} className="-rotate-90 text-[hsl(var(--muted-foreground))]" /></div>)}</div></section>
+     <section className="mt-10 animate-rise stagger-3"><SectionHeading eyebrow="Your footprint" title="Recent activity" action={<Link href="/network" data-testid="link-see-network" className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Open network <ArrowRight size={13} /></Link>} /><div className="card-surface divide-y divide-[hsl(var(--border))]">{activities.length ? activities.map(({ action, title, time, Icon: ActivityIcon }, index) => <div key={`${title}-${time}`} className="flex items-center gap-4 p-4 sm:p-5"><div className={`grid h-9 w-9 place-items-center rounded-lg ${index === 0 ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]'}`}><ActivityIcon size={16} /></div><div className="min-w-0 flex-1"><div className="text-xs text-[hsl(var(--muted-foreground))]">{action}</div><div data-testid={`text-activity-${index}`} className="truncate text-sm font-semibold">{title}</div></div><span className="hidden text-[11px] text-[hsl(var(--muted-foreground))] sm:block">{time}</span><ChevronDown size={14} className="-rotate-90 text-[hsl(var(--muted-foreground))]" /></div>) : <div className="p-6 text-sm text-[hsl(var(--muted-foreground))]">Your meaningful learning activity will appear here.</div>}</div></section>
     {assessment && <AssessmentModal close={() => setAssessment(false)} />}
   </div>;
 }
@@ -518,13 +529,14 @@ function AssessmentModal({ close }: { close: () => void }) {
 }
 
 function Learning() {
-  const { globalSearch, toast } = useApp();
+  const { globalSearch, courseCatalog, learningLoading, toast } = useApp();
   const [filter, setFilter] = useState('All paths');
   const [query, setQuery] = useState(globalSearch);
   const [saved, setSaved] = useState<string[]>([]);
-   const categories = ['All paths', 'Communication', 'Strategy', 'Leadership', 'Productivity', 'Career craft', 'Data analytics'];
-  const results = useMemo(() => courses.filter((course) => (filter === 'All paths' || course.category === filter) && course.title.toLowerCase().includes(query.toLowerCase())), [filter, query]);
-  return <div className="content-wrap"><div className="mb-9 animate-rise"><div className="eyebrow mb-3">The learning library</div><div className="flex flex-wrap items-end justify-between gap-5"><div><h1 className="display-title">Build the proof<br /><span className="serif font-normal italic text-[hsl(var(--primary))]">behind your next move.</span></h1><p className="mt-4 max-w-lg text-sm leading-6 text-[hsl(var(--muted-foreground))]">Short, practical paths for the work you want to be trusted with.</p></div><div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]"><span className="mono text-[hsl(var(--foreground))]">{courses.length}</span> paths to explore</div></div></div>
+  const categories = ['All paths', 'Communication', 'Strategy', 'Leadership', 'Productivity', 'Career craft', 'Data analytics'];
+  const results = useMemo(() => courseCatalog.filter((course) => (filter === 'All paths' || course.category === filter) && course.title.toLowerCase().includes(query.toLowerCase())), [courseCatalog, filter, query]);
+  if (learningLoading && !courseCatalog.length) return <div className="content-wrap"><div className="card-surface p-8 text-sm text-[hsl(var(--muted-foreground))]">Loading the learning library…</div></div>;
+  return <div className="content-wrap"><div className="mb-9 animate-rise"><div className="eyebrow mb-3">The learning library</div><div className="flex flex-wrap items-end justify-between gap-5"><div><h1 className="display-title">Build the proof<br /><span className="serif font-normal italic text-[hsl(var(--primary))]">behind your next move.</span></h1><p className="mt-4 max-w-lg text-sm leading-6 text-[hsl(var(--muted-foreground))]">Short, practical paths for the work you want to be trusted with.</p></div><div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]"><span className="mono text-[hsl(var(--foreground))]">{courseCatalog.length}</span> paths to explore</div></div></div>
     <div className="mb-7 flex flex-col gap-3 border-b border-[hsl(var(--border))] pb-5 md:flex-row md:items-center md:justify-between"><div className="flex flex-wrap gap-2">{categories.map((item) => <button data-testid={`button-filter-${item.toLowerCase().replace(' ', '-')}`} key={item} onClick={() => setFilter(item)} className={`pill border px-3 py-2 transition-colors ${filter === item ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))]'}`}>{item}</button>)}</div><div className="top-search w-full md:w-60"><Search size={14} /><input data-testid="input-course-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search paths..." /></div></div>
     {results.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{results.map((course, index) => <article key={course.id} className={`card-surface hoverable animate-rise p-5 ${index > 2 ? 'stagger-2' : ''}`}><div className="mb-7 flex items-start justify-between"><div className="grid h-11 w-11 place-items-center rounded-xl text-white" style={{ background: course.color }}><Sparkles size={19} /></div><button data-testid={`button-save-course-${course.id}`} onClick={() => { setSaved((current) => current.includes(course.id) ? current.filter((item) => item !== course.id) : [...current, course.id]); toast(saved.includes(course.id) ? 'Removed from saved paths.' : 'Saved for a future learning day.'); }} className={`icon-btn ${saved.includes(course.id) ? 'text-[hsl(var(--accent-foreground))]' : ''}`}><Plus size={17} className={saved.includes(course.id) ? 'rotate-45' : ''} /></button></div><span className="eyebrow">{course.category}</span><Link href={`/course/${course.id}`} data-testid={`link-library-course-${course.id}`} className="mt-2 block"><h2 className="min-h-[50px] text-lg font-bold leading-6 tracking-[-.04em]">{course.title}</h2></Link><p className="mt-3 min-h-[60px] text-xs leading-5 text-[hsl(var(--muted-foreground))]">{course.description}</p><div className="mt-6 flex items-center justify-between border-t border-[hsl(var(--border))] pt-4 text-[10px] text-[hsl(var(--muted-foreground))]"><span className="flex items-center gap-1.5"><Clock3 size={13} /> {course.duration}</span><span>{course.level}</span></div></article>)}</div> : <div data-testid="empty-course-results" className="card-surface flex min-h-64 flex-col items-center justify-center p-8 text-center"><Compass size={27} className="mb-3 text-[hsl(var(--primary))]" /><h3 className="font-bold">Nothing quite matches yet</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Try a broader search or another path.</p><button data-testid="button-clear-course-search" onClick={() => { setQuery(''); setFilter('All paths'); }} className="btn btn-quiet mt-5">Clear filters</button></div>}
   </div>;
@@ -532,13 +544,15 @@ function Learning() {
 
 function CourseDetail() {
   const { id } = useParams<{ id: string }>();
-  const { enrolled, enroll, advance, progressFor, toast } = useApp();
-  const course = courses.find((item) => item.id === id) || courses[0];
+  const { role, courseCatalog, learningLoading, enroll, advance, progressFor, toast } = useApp();
+  const course = courseCatalog.find((item) => item.id === id);
+  if (learningLoading && !course) return <div className="content-wrap"><div className="card-surface p-8 text-sm text-[hsl(var(--muted-foreground))]">Loading course details…</div></div>;
+  if (!course) return <div className="content-wrap"><div className="card-surface p-8"><div className="eyebrow mb-3">Course unavailable</div><h1 className="text-2xl font-bold">That learning path could not be found.</h1><Link href="/learning" className="btn btn-primary mt-5">Back to learning <ArrowRight size={14} /></Link></div></div>;
   const progress = progressFor(course.id);
-  const isEnrolled = enrolled.includes(course.id) || progress > 0;
+  const isEnrolled = Boolean(course.enrolled) || progress > 0;
   const [tab, setTab] = useState('Syllabus');
   const syllabus = ['Why stories move work', 'Find the human tension', 'Build a three-line brief', 'Present the decision, not the deck', 'Make your proof portable'];
-  return <div className="content-wrap"><div className="mb-5 flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]"><Link href="/learning" data-testid="link-back-learning" className="hover:text-[hsl(var(--primary))]">Learning</Link><ChevronDown size={13} className="-rotate-90" /><span>{course.category}</span></div><div className="grid gap-7 lg:grid-cols-[1.4fr_.6fr]"><section className="card-surface relative overflow-hidden p-7 sm:p-10"><div className="absolute -right-8 -top-8 h-48 w-48 rounded-full border-[25px]" style={{ borderColor: `${course.accent}35` }} /><span className="eyebrow">{course.category} · {course.level}</span><h1 className="serif relative mt-5 max-w-2xl text-5xl leading-[.96] tracking-[-.035em] sm:text-6xl">{course.title}</h1><p className="relative mt-6 max-w-xl text-sm leading-7 text-[hsl(var(--muted-foreground))]">{course.description}</p><div className="relative mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[hsl(var(--muted-foreground))]"><span className="flex items-center gap-2"><Clock3 size={14} /> {course.duration}</span><span className="flex items-center gap-2"><BookOpen size={14} /> {course.lessons} lessons</span><span className="flex items-center gap-2"><Award size={14} /> Certificate included</span></div></section><aside className="card-surface h-fit p-6"><div className="mb-5 flex items-center justify-between"><span className="eyebrow">Your progress</span><span className="mono text-xs text-[hsl(var(--primary))]">{progress}%</span></div><ProgressBar value={progress} color="coral" /><button data-testid="button-course-enrollment" onClick={() => { if (!isEnrolled) { enroll(course.id); toast('Course added to your learning shelf.'); } else { advance(course.id); toast('Progress saved — one step at a time.'); } }} className="btn btn-primary mt-7 w-full">{isEnrolled ? <><Play size={14} /> Continue course</> : <><Plus size={14} /> Enroll in path</>}</button><div className="mt-6 flex items-center gap-3 border-t border-[hsl(var(--border))] pt-5"><IconAvatar text={course.initials} tone="sand" /><div><div className="text-xs font-bold">{course.trainer}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">Trainer · 12k learners</div></div></div></aside></div><div className="mt-9 grid gap-8 lg:grid-cols-[1.4fr_.6fr]"><section><div className="mb-5 flex gap-6 border-b border-[hsl(var(--border))]">{['Syllabus', 'Resources'].map((item) => <button data-testid={`button-tab-${item.toLowerCase()}`} key={item} onClick={() => setTab(item)} className={`border-b-2 pb-3 text-xs font-bold ${tab === item ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))]'}`}>{item}</button>)}</div>{tab === 'Syllabus' ? <div className="card-surface divide-y divide-[hsl(var(--border))]">{syllabus.map((lesson, index) => <div key={lesson} className="flex items-center gap-4 p-4"><div className={`grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${index < 3 && progress > 0 ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]'}`}>{index < 3 && progress > 0 ? <Check size={14} /> : `0${index + 1}`}</div><span className="flex-1 text-sm font-semibold">{lesson}</span><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{index + 1} lesson{index ? 's' : ''}</span><ChevronDown size={14} className="-rotate-90 text-[hsl(var(--muted-foreground))]" /></div>)}</div> : <div className="card-surface space-y-3 p-5">{['The three-line brief · PDF', 'Story before slides · audio note', 'Decision narrative worksheet'].map((item) => <button data-testid={`button-resource-${item.slice(0, 5)}`} key={item} onClick={() => toast(`${item} opened in the demo.`)} className="flex w-full items-center gap-3 rounded-lg border border-[hsl(var(--border))] p-4 text-left hover:bg-[hsl(var(--secondary)/.5)]"><FileText size={17} className="text-[hsl(var(--primary))]" /><span className="flex-1 text-xs font-semibold">{item}</span><ArrowRight size={14} /></button>)}</div>}</section><aside><div className="eyebrow mb-4">Skills you will practice</div><div className="flex flex-wrap gap-2">{course.skills.map((skill) => <span className="tag" key={skill}>{skill}</span>)}</div><div className="mt-9 rounded-xl bg-[hsl(var(--secondary)/.65)] p-5"><Lightbulb size={18} className="mb-4 text-[hsl(var(--accent-foreground))]" /><h3 className="text-sm font-bold">Why this path?</h3><p className="mt-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">The best work is easier to trust when you can tell the story of how you got there.</p></div></aside></div></div>;
+  return <div className="content-wrap"><div className="mb-5 flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]"><Link href="/learning" data-testid="link-back-learning" className="hover:text-[hsl(var(--primary))]">Learning</Link><ChevronDown size={13} className="-rotate-90" /><span>{course.category}</span></div><div className="grid gap-7 lg:grid-cols-[1.4fr_.6fr]"><section className="card-surface relative overflow-hidden p-7 sm:p-10"><div className="absolute -right-8 -top-8 h-48 w-48 rounded-full border-[25px]" style={{ borderColor: `${course.accent}35` }} /><span className="eyebrow">{course.category} · {course.level}</span><h1 className="serif relative mt-5 max-w-2xl text-5xl leading-[.96] tracking-[-.035em] sm:text-6xl">{course.title}</h1><p className="relative mt-6 max-w-xl text-sm leading-7 text-[hsl(var(--muted-foreground))]">{course.description}</p><div className="relative mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[hsl(var(--muted-foreground))]"><span className="flex items-center gap-2"><Clock3 size={14} /> {course.duration}</span><span className="flex items-center gap-2"><BookOpen size={14} /> {course.lessons} lessons</span><span className="flex items-center gap-2"><Award size={14} /> Certificate included</span></div></section><aside className="card-surface h-fit p-6"><div className="mb-5 flex items-center justify-between"><span className="eyebrow">Your progress</span><span className="mono text-xs text-[hsl(var(--primary))]">{progress}%</span></div><ProgressBar value={progress} color="coral" /><button data-testid="button-course-enrollment" disabled={role !== 'TRAINEE'} onClick={() => { if (role !== 'TRAINEE') return; const action = isEnrolled ? advance(course.id) : enroll(course.id); void action.then(() => toast(isEnrolled ? 'Progress saved — one step at a time.' : 'Course added to your learning shelf.')).catch((error) => toast(error instanceof Error ? error.message : 'We could not save that learning change.')); }} className="btn btn-primary mt-7 w-full disabled:opacity-50">{role !== 'TRAINEE' ? 'Trainee access required' : isEnrolled ? <><Play size={14} /> Continue course</> : <><Plus size={14} /> Enroll in path</>}</button><div className="mt-6 flex items-center gap-3 border-t border-[hsl(var(--border))] pt-5"><IconAvatar text={course.initials} tone="sand" /><div><div className="text-xs font-bold">{course.trainer}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">Trainer · course facilitator</div></div></div></aside></div><div className="mt-9 grid gap-8 lg:grid-cols-[1.4fr_.6fr]"><section><div className="mb-5 flex gap-6 border-b border-[hsl(var(--border))]">{['Syllabus', 'Resources'].map((item) => <button data-testid={`button-tab-${item.toLowerCase()}`} key={item} onClick={() => setTab(item)} className={`border-b-2 pb-3 text-xs font-bold ${tab === item ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))]'}`}>{item}</button>)}</div>{tab === 'Syllabus' ? <div className="card-surface divide-y divide-[hsl(var(--border))]">{syllabus.map((lesson, index) => <div key={lesson} className="flex items-center gap-4 p-4"><div className={`grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${index < 3 && progress > 0 ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]'}`}>{index < 3 && progress > 0 ? <Check size={14} /> : `0${index + 1}`}</div><span className="flex-1 text-sm font-semibold">{lesson}</span><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{index + 1} lesson{index ? 's' : ''}</span><ChevronDown size={14} className="-rotate-90 text-[hsl(var(--muted-foreground))]" /></div>)}</div> : <div className="card-surface space-y-3 p-5">{['The three-line brief · PDF', 'Story before slides · audio note', 'Decision narrative worksheet'].map((item) => <button data-testid={`button-resource-${item.slice(0, 5)}`} key={item} onClick={() => toast(`${item} opened in the demo.`)} className="flex w-full items-center gap-3 rounded-lg border border-[hsl(var(--border))] p-4 text-left hover:bg-[hsl(var(--secondary)/.5)]"><FileText size={17} className="text-[hsl(var(--primary))]" /><span className="flex-1 text-xs font-semibold">{item}</span><ArrowRight size={14} /></button>)}</div>}</section><aside><div className="eyebrow mb-4">Skills you will practice</div><div className="flex flex-wrap gap-2">{course.skills.map((skill) => <span className="tag" key={skill}>{skill}</span>)}</div><div className="mt-9 rounded-xl bg-[hsl(var(--secondary)/.65)] p-5"><Lightbulb size={18} className="mb-4 text-[hsl(var(--accent-foreground))]" /><h3 className="text-sm font-bold">Why this path?</h3><p className="mt-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">The best work is easier to trust when you can tell the story of how you got there.</p></div></aside></div></div>;
 }
 
 function Network() {
@@ -575,9 +589,10 @@ function AppProvider({ children }: { children: ReactNode }) {
   const [accessibilityMode, setAccessibilityMode] = useState(localStorage.getItem('capacity-connect-accessibility') === 'on');
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [courseCatalog, setCourseCatalog] = useState<Course[]>([]);
+  const [learningSummary, setLearningSummary] = useState<LearningSummary>({ streak: 0, overallProgress: 0, weeklyMinutes: 0, weeklyActivity: [0, 0, 0, 0, 0, 0, 0], enrolledCourses: [], activities: [] });
+  const [learningLoading, setLearningLoading] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
-  const [enrolled, setEnrolled] = useState<string[]>(['product-storytelling']);
-  const [progresses, setProgresses] = useState<Record<string, number>>(() => Object.fromEntries(courses.map((course) => [course.id, course.progress])));
   const [posts, setPosts] = useState(initialPosts);
   const [following, setFollowing] = useState<string[]>([]);
   const [notices, setNotices] = useState(initialNotices);
@@ -608,6 +623,30 @@ function AppProvider({ children }: { children: ReactNode }) {
       .finally(() => { if (!cancelled) setApplicationsLoading(false); });
     return () => { cancelled = true; };
   }, [user?.id, user?.role]);
+  const refreshLearning = async () => {
+    if (!user) return;
+    setLearningLoading(true);
+    try {
+      const catalogResult = await authRequest<{ courses: Course[] }>('/courses');
+      setCourseCatalog(catalogResult.courses);
+      if (user.role === 'TRAINEE') {
+        const summaryResult = await authRequest<LearningSummary>('/learning/summary');
+        setLearningSummary(summaryResult);
+      } else {
+        setLearningSummary({ streak: 0, overallProgress: 0, weeklyMinutes: 0, weeklyActivity: [0, 0, 0, 0, 0, 0, 0], enrolledCourses: [], activities: [] });
+      }
+    } finally {
+      setLearningLoading(false);
+    }
+  };
+  useEffect(() => {
+    if (!user) {
+      setCourseCatalog([]);
+      setLearningSummary({ streak: 0, overallProgress: 0, weeklyMinutes: 0, weeklyActivity: [0, 0, 0, 0, 0, 0, 0], enrolledCourses: [], activities: [] });
+      return;
+    }
+    void refreshLearning().catch(() => undefined);
+  }, [user?.id, user?.role]);
   useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); localStorage.setItem('prolearn-theme', theme); }, [theme]);
   useEffect(() => { document.documentElement.classList.toggle('reduced-motion', accessibilityMode); localStorage.setItem('capacity-connect-accessibility', accessibilityMode ? 'on' : 'off'); }, [accessibilityMode]);
   const signIn = async (email: string, password: string, admin = false) => {
@@ -623,18 +662,24 @@ function AppProvider({ children }: { children: ReactNode }) {
     setApprovals((current) => current.map((application) => application.id === id ? result.application : application));
     return result.application;
   };
+  const enroll = async (id: string) => {
+    await authRequest(`/courses/${id}/enroll`, { method: 'POST' });
+    await refreshLearning();
+  };
+  const advance = async (id: string) => {
+    const current = courseCatalog.find((course) => course.id === id)?.progress ?? 0;
+    await authRequest(`/courses/${id}/progress`, { method: 'POST', body: JSON.stringify({ progress: Math.min(current + 8, 100), durationMinutes: 15 }) });
+    await refreshLearning();
+  };
+  const enrolled = courseCatalog.filter((course) => course.enrolled).map((course) => course.id);
+  const progressFor = (id: string) => courseCatalog.find((course) => course.id === id)?.progress ?? 0;
   const role = user?.role ?? 'TRAINEE';
   const value: AppContextValue = {
     theme, toggleTheme: () => setTheme((current) => current === 'dark' ? 'light' : 'dark'),
     accessibilityMode, toggleAccessibility: () => setAccessibilityMode((current) => !current),
-    user, authLoading, role, signIn, signUp, signOut,
+    user, authLoading, role, signIn, signUp, signOut, courseCatalog, learningSummary, learningLoading,
     globalSearch, setGlobalSearch,
-    enrolled, enroll: (id) => setEnrolled((current) => current.includes(id) ? current : [...current, id]),
-    advance: (id) => {
-      setEnrolled((current) => current.includes(id) ? current : [...current, id]);
-      setProgresses((current) => ({ ...current, [id]: Math.min((current[id] || 0) + 8, 100) }));
-    },
-    progressFor: (id) => progresses[id] || 0,
+    enrolled, enroll, advance, progressFor,
     posts, react: (id) => setPosts((current) => current.map((post) => post.id === id ? { ...post, liked: !post.liked, likes: post.likes + (post.liked ? -1 : 1) } : post)),
     follow: (name) => setFollowing((current) => current.includes(name) ? current.filter((item) => item !== name) : [...current, name]),
     following, publish: (body) => setPosts((current) => [{ id: Date.now(), name: profile.name, role: profile.role, initials: initials(profile.name), time: 'Just now', body, tags: ['#learning-in-public'], likes: 0, comments: 0 }, ...current]),
@@ -653,10 +698,10 @@ function Router() {
   if (['/login', '/admin/login', '/signup'].includes(location)) {
     return <AuthenticatedRedirect role={role} setLocation={setLocation} />;
   }
-  return <Shell><ErrorRouteBoundary><Switch><Route path="/" component={Home} /><Route path="/path" component={LearningPath} /><Route path="/learning" component={Learning} /><Route path="/course/:id" component={CourseDetail} /><Route path="/network" component={Network} /><Route path="/trainer" component={role === 'TRAINER' ? TrainerDashboard : AccessDenied} /><Route path="/sessions" component={role === 'TRAINER' ? TrainerSessions : AccessDenied} /><Route path="/admin" component={role === 'ADMIN' ? AdminDashboard : AccessDenied} /><Route path="/insights" component={role === 'ADMIN' ? AdminInsights : AccessDenied} /><Route path="/competencies" component={role === 'ADMIN' || role === 'TRAINER' ? Competencies : AccessDenied} /><Route path="/passport" component={SkillPassport} /><Route path="/verify" component={CertificateVerification} /><Route path="/accessibility" component={Accessibility} /><Route path="/profile" component={Profile} /><Route path="/notifications" component={Notifications} /><Route path="/settings" component={Settings} /><Route component={NotFound} /></Switch></ErrorRouteBoundary></Shell>;
+  return <Shell><ErrorRouteBoundary><Switch><Route path="/" component={Home} /><Route path="/trainee/dashboard" component={role === 'TRAINEE' ? TraineeHome : AccessDenied} /><Route path="/path" component={LearningPath} /><Route path="/learning" component={Learning} /><Route path="/course/:id" component={CourseDetail} /><Route path="/network" component={Network} /><Route path="/trainer/dashboard" component={role === 'TRAINER' ? TrainerDashboard : AccessDenied} /><Route path="/trainer" component={role === 'TRAINER' ? TrainerDashboard : AccessDenied} /><Route path="/sessions" component={role === 'TRAINER' ? TrainerSessions : AccessDenied} /><Route path="/admin/dashboard" component={role === 'ADMIN' ? AdminDashboard : AccessDenied} /><Route path="/admin" component={role === 'ADMIN' ? AdminDashboard : AccessDenied} /><Route path="/insights" component={role === 'ADMIN' ? AdminInsights : AccessDenied} /><Route path="/competencies" component={role === 'ADMIN' || role === 'TRAINER' ? Competencies : AccessDenied} /><Route path="/passport" component={SkillPassport} /><Route path="/verify" component={CertificateVerification} /><Route path="/accessibility" component={Accessibility} /><Route path="/profile" component={Profile} /><Route path="/notifications" component={Notifications} /><Route path="/settings" component={Settings} /><Route component={NotFound} /></Switch></ErrorRouteBoundary></Shell>;
 }
 function AuthenticatedRedirect({ role, setLocation }: { role: Role; setLocation: (path: string) => void }) {
-  useEffect(() => { setLocation(role === 'ADMIN' ? '/admin' : role === 'TRAINER' ? '/trainer' : '/'); }, [role, setLocation]);
+  useEffect(() => { setLocation(role === 'ADMIN' ? '/admin/dashboard' : role === 'TRAINER' ? '/trainer/dashboard' : '/trainee/dashboard'); }, [role, setLocation]);
   return <LoadingScreen />;
 }
 function AccessDenied() {

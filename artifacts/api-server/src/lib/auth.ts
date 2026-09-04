@@ -151,6 +151,24 @@ export async function requireAdminProfile(req: Request, res: Response): Promise<
   return profile;
 }
 
+export async function requireApprovedProfile(req: Request, res: Response, roles?: AppRole[]): Promise<Profile | null> {
+  const profile = await getAuthenticatedProfile(req, res);
+  if (!profile) {
+    res.status(401).json({ message: "Sign in required." });
+    return null;
+  }
+  if (!isAllowedStatus(profile.status)) {
+    clearSessionCookie(res);
+    res.status(403).json({ message: "Your account is not active." });
+    return null;
+  }
+  if (roles && !roles.includes(profile.role as AppRole)) {
+    res.status(403).json({ message: "Your account does not have access to this feature." });
+    return null;
+  }
+  return profile;
+}
+
 export function profilePayload(profile: Profile) {
   return {
     id: profile.id,
