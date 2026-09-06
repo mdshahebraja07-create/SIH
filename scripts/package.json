@@ -5,10 +5,15 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "bootstrap-admin": "tsx ./src/bootstrap-admin.ts",
+    "verify-admin": "tsx ./src/verify-admin.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@replit/connectors-sdk": "^0.4.1",
     "@types/node": "catalog:",
+    "drizzle-orm": "catalog:",
+    "@workspace/db": "workspace:*",
     "tsx": "catalog:"
   }
 }

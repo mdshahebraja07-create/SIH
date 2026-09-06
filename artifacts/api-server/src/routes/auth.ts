@@ -142,6 +142,62 @@ router.get("/auth/admin/trainer-applications", async (req, res) => {
   }
 });
 
+router.get("/auth/admin/users", async (req, res) => {
+  try {
+    const admin = await requireAdminProfile(req, res);
+    if (!admin) return;
+
+    const users = await db
+      .select()
+      .from(profiles)
+      .orderBy(desc(profiles.createdAt));
+
+    res.json({ users: users.map(trainerApplicationPayload) });
+  } catch (error) {
+    req.log.error({ err: error }, "Admin user lookup failed");
+    res.status(500).json({ message: "Users are temporarily unavailable." });
+  }
+});
+
+router.patch("/auth/admin/users/:id/status", async (req, res) => {
+  try {
+    const admin = await requireAdminProfile(req, res);
+    if (!admin) return;
+
+    const { id } = req.params;
+    const { status } = req.body as { status?: unknown };
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      res.status(400).json({ message: "That user id is invalid." });
+      return;
+    }
+    if (!isManagedAccountStatus(status) || status === "PENDING") {
+      res.status(400).json({ message: "Choose Approved, Rejected, or Suspended." });
+      return;
+    }
+    if (id === admin.id) {
+      res.status(400).json({ message: "You cannot change your own administrator status." });
+      return;
+    }
+
+    const [updatedProfile] = await db
+      .update(profiles)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(profiles.id, id), eq(profiles.role, "TRAINEE")))
+      .returning();
+
+    if (!updatedProfile) {
+      res.status(404).json({ message: "Trainee not found." });
+      return;
+    }
+
+    req.log.info({ userId: id, status }, "Trainee account status changed");
+    res.json({ user: trainerApplicationPayload(updatedProfile) });
+  } catch (error) {
+    req.log.error({ err: error }, "Admin user status change failed");
+    res.status(500).json({ message: "We could not update that user." });
+  }
+});
+
 router.patch("/auth/admin/trainer-applications/:id/status", async (req, res) => {
   try {
     const admin = await requireAdminProfile(req, res);

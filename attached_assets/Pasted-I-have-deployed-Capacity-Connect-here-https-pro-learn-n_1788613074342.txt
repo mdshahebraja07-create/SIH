@@ -1,0 +1,114 @@
+I have deployed Capacity Connect here:
+
+https://pro-learn-network--shahidraza9234.replit.app/
+
+I cannot see an Admin portal and I currently do not have a working Admin account.
+
+DO NOT just add a fake Admin button to the frontend.
+
+First inspect the COMPLETE existing project and deployed configuration.
+
+My goal is:
+
+FIRST ADMIN SETUP
+- Create/provision ONE real Admin account securely.
+- Use Supabase Auth for authentication.
+- Store the application's ADMIN role/status in the existing profiles database.
+- The Admin account must have:
+  role = ADMIN
+  status = APPROVED
+- Do NOT hard-code the password in frontend code.
+- Do NOT expose the password in GitHub, React code, API responses, logs, or the UI.
+- Do NOT allow normal signup users to select ADMIN.
+- Do NOT allow a user to promote themselves to ADMIN.
+
+I want to use MY OWN email address as the first Admin email.
+
+Create a secure ONE-TIME bootstrap/admin-provisioning mechanism where I can enter my own Admin email and password securely through Replit Secrets/environment variables or an equivalent server-side mechanism.
+
+After provisioning, tell me:
+- exactly which email I should use
+- where I set my password
+- the exact one-time command/action to create the Admin
+- how to verify the Admin profile exists
+- how to remove/disable the bootstrap mechanism afterward
+
+ADMIN LOGIN
+Add a clearly visible "Admin Login" option to the existing login interface.
+
+Admin login must:
+1. Authenticate through the existing Supabase Auth.
+2. Retrieve the user's application profile server-side.
+3. Verify role === ADMIN.
+4. Verify status === APPROVED.
+5. Reject everyone else.
+6. Redirect an authenticated Admin to /admin or the existing Admin Dashboard route.
+
+ADMIN PORTAL
+Ensure the Admin Dashboard is actually implemented and reachable after Admin login.
+
+It must contain:
+- Dashboard overview
+- User Management
+- Pending Trainers
+- Approve Trainer
+- Reject Trainer
+- Suspend/Restore users
+- Trainee management
+- Trainer management
+- Course management
+- Assessment management
+- Certificates
+- Competency mapping
+- Notifications
+- Announcements
+- Achievements
+- Analytics
+- Audit logs
+
+TRAINER FLOW
+Verify this complete flow with the REAL database:
+
+Trainer signup
+→ email verification
+→ TRAINER + PENDING
+→ Admin sees trainer in Pending Trainers
+→ Admin approves
+→ TRAINER + APPROVED
+→ Trainer can access Trainer Dashboard
+
+SECURITY
+- Authorization must be server-side.
+- Never trust role from the frontend.
+- Never expose admin credentials.
+- Never allow ADMIN through public signup.
+- Do not create a universal/default password.
+- Do not bypass Supabase authentication.
+- Keep existing Trainee/Trainer authentication working.
+
+DEPLOYMENT
+The deployed Replit application is the important target.
+
+Check that the deployed app and backend use the correct:
+- Supabase URL
+- Supabase keys
+- DATABASE_URL
+- SESSION_SECRET
+- other required environment variables
+
+Run typecheck/build/tests where available.
+
+FINAL RESPONSE:
+Give me a clear report containing:
+1. Why Admin is currently missing.
+2. Why I cannot log in as Admin.
+3. Exact files changed.
+4. Exact one-time Admin provisioning command.
+5. Exact place where I enter my own Admin email.
+6. Exact place where I securely set my own Admin password.
+7. Admin login URL.
+8. Admin dashboard URL.
+9. How I approve my first Trainer.
+10. Confirmation that no Admin password is exposed in source code.
+
+Do NOT proceed to unrelated feature development until the complete Admin login → Admin Dashboard → Trainer approval flow works.

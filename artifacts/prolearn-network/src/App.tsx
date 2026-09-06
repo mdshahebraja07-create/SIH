@@ -33,6 +33,7 @@ type AuthUser = {
   location: string; bio: string; skills: string[]; emailVerified: boolean;
 };
 type TrainerApplication = AuthUser & { createdAt: string; updatedAt: string };
+type AdminUser = TrainerApplication;
 
 const courses: Course[] = [
   { id: 'product-storytelling', title: 'Product storytelling for people who build', category: 'Communication', level: 'Intermediate', duration: '4h 20m', lessons: 12, progress: 68, description: 'Make complex work easy to understand, memorable to champion, and impossible to overlook.', trainer: 'Maya Okafor', initials: 'MO', color: '#174f4d', accent: '#f28d72', skills: ['Narrative design', 'Presenting', 'Stakeholder influence'] },
@@ -108,6 +109,9 @@ type AppContextValue = {
   approvals: TrainerApplication[];
   applicationsLoading: boolean; applicationsError: string;
   updateApplicationStatus: (id: string, status: AccountStatus) => Promise<TrainerApplication>;
+  adminUsers: AdminUser[];
+  adminUsersLoading: boolean; adminUsersError: string;
+  updateUserStatus: (id: string, status: AccountStatus) => Promise<AdminUser>;
   profile: { name: string; role: string; location: string; bio: string; skills: string[] };
   updateProfile: (profile: AppContextValue['profile']) => void;
   toast: (message: string) => void;
@@ -207,6 +211,7 @@ function AuthScreen() {
           <button data-testid="button-auth-submit" disabled={busy} className="btn btn-primary w-full disabled:opacity-50">{busy ? 'Checking…' : isSignup ? 'Create account' : 'Sign in'} <ArrowRight size={14} /></button>
         </form>
         {!isAdmin && !isSignup && <div className="mt-5 text-center text-xs text-[hsl(var(--muted-foreground))]">New here? <button className="font-bold text-[hsl(var(--primary))]" onClick={() => setLocation('/signup')}>Create a member account</button></div>}
+         {!isAdmin && !isSignup && <div className="mt-3 text-center text-xs text-[hsl(var(--muted-foreground))]">Platform administrator? <button data-testid="link-admin-login" className="font-bold text-[hsl(var(--primary))]" onClick={() => setLocation('/admin/login')}>Admin login</button></div>}
         {!isAdmin && isSignup && <div className="mt-5 text-center text-xs text-[hsl(var(--muted-foreground))]">Already have an account? <button className="font-bold text-[hsl(var(--primary))]" onClick={() => setLocation('/login')}>Sign in</button></div>}
         {isAdmin && <div className="mt-5 text-center text-xs text-[hsl(var(--muted-foreground))]">Member of the learning network? <button className="font-bold text-[hsl(var(--primary))]" onClick={() => setLocation('/login')}>Use member sign in</button></div>}
       </section>
@@ -441,7 +446,7 @@ function TrainerDashboard() {
 }
 
 function AdminDashboard() {
-  const { approvals, applicationsLoading, applicationsError, updateApplicationStatus, toast } = useApp();
+  const { approvals, applicationsLoading, applicationsError, updateApplicationStatus, adminUsers, adminUsersLoading, adminUsersError, updateUserStatus, toast } = useApp();
   const [announcement, setAnnouncement] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const pendingCount = approvals.filter((application) => application.status === 'PENDING').length;
@@ -460,6 +465,17 @@ function AdminDashboard() {
       setUpdatingId(null);
     }
   };
+  const changeUserStatus = async (user: AdminUser, status: AccountStatus) => {
+    setUpdatingId(user.id);
+    try {
+      await updateUserStatus(user.id, status);
+      toast(`${user.name} is now ${statusLabel(status).toLowerCase()}.`);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'We could not update that user.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
   const adminMetrics = [
     { label: 'Total users', value: '2,481', detail: '2,020 trainees · 438 trainers' },
     { label: 'Courses', value: '146', detail: '+12 published this quarter' },
@@ -474,6 +490,7 @@ function AdminDashboard() {
       <section className="animate-rise stagger-2"><SectionHeading eyebrow="Organizational pulse" title="Platform analytics" action={<button className="btn btn-quiet" onClick={() => toast('Analytics export prepared for download.')}>Export report <ArrowRight size={13} /></button>} /><div className="card-surface p-5"><div className="mb-6 flex items-center justify-between"><div><div className="text-sm font-bold">Learning participation</div><div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Active learners across all programs</div></div><span className="metric-number text-[hsl(var(--primary))]">82%</span></div><ProgressBar value={82} /><div className="mt-7 grid grid-cols-3 gap-3">{[['Pass rate', '78%'], ['Active trainers', '438'], ['New content', '24']].map(([label, value]) => <div key={label} className="rounded-xl bg-[hsl(var(--secondary)/.62)] p-4"><div className="mono text-lg font-bold">{value}</div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{label}</div></div>)}</div><div className="mt-6 flex items-end gap-2 border-b border-[hsl(var(--border))] pb-1">{[42, 61, 55, 72, 68, 84, 82, 91, 82].map((height, index) => <div key={`${height}-${index}`} className="chart-bar flex-1" style={{ height: `${height * .55}px`, opacity: index === 8 ? 1 : .45 + index * .05 }} />)}</div><div className="mt-2 flex justify-between text-[10px] text-[hsl(var(--muted-foreground))]"><span>Jan</span><span>Sep 2026</span></div></div></section>
     </div>
     <section className="mt-8 card-surface animate-rise stagger-3 p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]"><Target size={19} /></div><div><div className="eyebrow">Standout system</div><h2 className="mt-1 text-lg font-bold">Competency mapping is ready for review</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Match trainers to organizational needs with explainable scoring.</p></div></div><Link href="/competencies" className="btn btn-outline">Open competency map <ArrowRight size={14} /></Link></div></section>
+      <section className="mt-8 animate-rise card-surface p-6"><SectionHeading eyebrow="User management" title="Trainees and account status" action={<span className="pill pill-teal">{adminUsers.length} profiles</span>} /><div className="card-surface divide-y divide-[hsl(var(--border))]">{adminUsersLoading ? <div className="p-8 text-center text-xs text-[hsl(var(--muted-foreground))]">Loading user directory…</div> : adminUsersError ? <div className="p-8 text-center text-xs text-[hsl(var(--destructive))]">{adminUsersError}</div> : adminUsers.length ? adminUsers.slice(0, 12).map((managedUser) => <div key={managedUser.id} className="flex flex-wrap items-center gap-3 p-4"><IconAvatar text={initials(managedUser.name)} size="sm" tone={managedUser.role === 'TRAINER' ? 'sand' : 'coral'} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2 text-xs font-bold"><span>{managedUser.name}</span><span className={`pill ${statusPillClass(managedUser.status)}`}>{roleCopy[managedUser.role].label} · {statusLabel(managedUser.status)}</span></div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{managedUser.email} · Joined {new Date(managedUser.createdAt).toLocaleDateString()}</div></div>{managedUser.role === 'TRAINEE' && <div className="flex gap-2">{managedUser.status === 'SUSPENDED' ? <button data-testid={`button-restore-user-${managedUser.id}`} disabled={updatingId === managedUser.id} className="btn btn-primary px-3 py-2" onClick={() => void changeUserStatus(managedUser, 'APPROVED')}><Check size={13} /> Restore</button> : managedUser.status === 'APPROVED' && <button data-testid={`button-suspend-user-${managedUser.id}`} disabled={updatingId === managedUser.id} className="btn btn-outline px-3 py-2" onClick={() => void changeUserStatus(managedUser, 'SUSPENDED')}><ShieldCheck size={13} /> Suspend</button>}</div>}</div>) : <div className="p-8 text-center text-xs text-[hsl(var(--muted-foreground))]">No profiles have been provisioned yet.</div>}</div>{adminUsers.length > 12 && <p className="mt-3 text-[10px] text-[hsl(var(--muted-foreground))]">Showing the 12 most recent profiles.</p>}</section>
     {announcement && <div className="modal-backdrop"><div className="modal animate-rise"><div className="flex items-center justify-between border-b border-[hsl(var(--border))] p-5"><div><div className="eyebrow mb-1">Homepage publishing</div><h2 className="text-lg font-bold">Publish an update</h2></div><button className="icon-btn" onClick={() => setAnnouncement(false)}><X size={18} /></button></div><div className="space-y-4 p-6"><label className="block text-xs font-bold">Headline<input className="form-input mt-2" defaultValue="New learning content is live" /></label><label className="block text-xs font-bold">Message<textarea className="form-input mt-2 min-h-24 resize-none" defaultValue="Explore the newest paths added by our trainer community." /></label><div className="flex justify-end gap-2 pt-2"><button className="btn btn-quiet" onClick={() => setAnnouncement(false)}>Cancel</button><button className="btn btn-primary" onClick={() => { setAnnouncement(false); toast('Update published to the Capacity Connect home feed.'); }}><Check size={14} /> Publish now</button></div></div></div></div>}
   </div>;
 }
@@ -584,6 +601,9 @@ function AppProvider({ children }: { children: ReactNode }) {
   const [approvals, setApprovals] = useState<TrainerApplication[]>([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
   const [applicationsError, setApplicationsError] = useState('');
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminUsersLoading, setAdminUsersLoading] = useState(false);
+  const [adminUsersError, setAdminUsersError] = useState('');
   const [profile, setProfile] = useState({ name: 'Amina Mensah', role: 'Product operations trainee', location: 'Accra, Ghana', bio: 'I make the messy middle of product work a little clearer. Currently learning in public and collecting better questions.', skills: ['Product thinking', 'Communication', 'Research'] });
   const [toastMessage, setToastMessage] = useState('');
   useEffect(() => {
@@ -597,15 +617,36 @@ function AppProvider({ children }: { children: ReactNode }) {
       setApprovals([]);
       setApplicationsError('');
       setApplicationsLoading(false);
+      setAdminUsers([]);
+      setAdminUsersError('');
+      setAdminUsersLoading(false);
       return;
     }
     let cancelled = false;
     setApplicationsLoading(true);
     setApplicationsError('');
-    void authRequest<{ applications: TrainerApplication[] }>('/auth/admin/trainer-applications')
-      .then((result) => { if (!cancelled) setApprovals(result.applications); })
-      .catch((error) => { if (!cancelled) setApplicationsError(error instanceof Error ? error.message : 'Trainer applications are temporarily unavailable.'); })
-      .finally(() => { if (!cancelled) setApplicationsLoading(false); });
+    setAdminUsersLoading(true);
+    setAdminUsersError('');
+    void Promise.all([
+      authRequest<{ applications: TrainerApplication[] }>('/auth/admin/trainer-applications'),
+      authRequest<{ users: AdminUser[] }>('/auth/admin/users'),
+    ])
+      .then(([applicationsResult, usersResult]) => {
+        if (cancelled) return;
+        setApprovals(applicationsResult.applications);
+        setAdminUsers(usersResult.users);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : 'Administrator data is temporarily unavailable.';
+        setApplicationsError(message);
+        setAdminUsersError(message);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setApplicationsLoading(false);
+        setAdminUsersLoading(false);
+      });
     return () => { cancelled = true; };
   }, [user?.id, user?.role]);
   useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); localStorage.setItem('prolearn-theme', theme); }, [theme]);
@@ -622,6 +663,11 @@ function AppProvider({ children }: { children: ReactNode }) {
     const result = await authRequest<{ application: TrainerApplication }>(`/auth/admin/trainer-applications/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
     setApprovals((current) => current.map((application) => application.id === id ? result.application : application));
     return result.application;
+  };
+  const updateUserStatus = async (id: string, status: AccountStatus) => {
+    const result = await authRequest<{ user: AdminUser }>(`/auth/admin/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    setAdminUsers((current) => current.map((managedUser) => managedUser.id === id ? result.user : managedUser));
+    return result.user;
   };
   const role = user?.role ?? 'TRAINEE';
   const value: AppContextValue = {
@@ -640,6 +686,7 @@ function AppProvider({ children }: { children: ReactNode }) {
     following, publish: (body) => setPosts((current) => [{ id: Date.now(), name: profile.name, role: profile.role, initials: initials(profile.name), time: 'Just now', body, tags: ['#learning-in-public'], likes: 0, comments: 0 }, ...current]),
     notices, markRead: (id) => setNotices((current) => current.map((notice) => notice.id === id ? { ...notice, read: true } : notice)), markAllRead: () => setNotices((current) => current.map((notice) => ({ ...notice, read: true }))),
     approvals, applicationsLoading, applicationsError, updateApplicationStatus,
+    adminUsers, adminUsersLoading, adminUsersError, updateUserStatus,
     profile, updateProfile: setProfile, toast: (message) => { setToastMessage(message); window.setTimeout(() => setToastMessage(''), 2800); },
   };
   return <AppContext.Provider value={value}>{children}{toastMessage && <NoticeToast message={toastMessage} close={() => setToastMessage('')} />}</AppContext.Provider>;

@@ -1,15 +1,19 @@
-# [Project name]
+# Capacity Connect
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Capacity Connect is a professional learning network where trainees build skills, trainers teach, and administrators review account access and learning operations.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/prolearn-network run dev` — run the web app
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/scripts run bootstrap-admin` — one-time server-side first-admin provisioning
+- `pnpm --filter @workspace/scripts run verify-admin -- --email you@example.com` — verify the application profile for an admin email
+- Required runtime secrets: `DATABASE_URL` and `SESSION_SECRET`
+- The admin bootstrap command additionally requires temporary Replit Secrets `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD`, plus `ADMIN_BOOTSTRAP_ENABLED=true`. It never prints or stores the password in source code.
 
 ## Stack
 
@@ -22,23 +26,34 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/prolearn-network` — React/Vite Capacity Connect web app and role-aware routes
+- `artifacts/api-server/src/routes/auth.ts` — signup, login, admin authorization, trainer approval, and user-management endpoints
+- `artifacts/api-server/src/lib/auth.ts` — signed HttpOnly session cookie and server-side profile authorization
+- `lib/db/src/schema/index.ts` — application-owned `profiles` table and role/status enums
+- `scripts/src/bootstrap-admin.ts` — one-time admin provisioning through Supabase Auth plus the application database
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Supabase Auth is the identity provider; application role and status are read from the server-owned `profiles` table.
+- Public signup only accepts `TRAINEE` or `TRAINER`; `ADMIN` is never accepted from browser input.
+- Admin routes require an authenticated Supabase user plus `profiles.role = ADMIN` and `profiles.status = APPROVED`.
+- The first admin is provisioned by a temporary server-side command, not by a frontend control or a universal password.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Trainee learning paths, courses, competency signals, certificates, and professional network
+- Trainer workspace with pending-application lifecycle and teaching tools
+- Admin control center with live trainer applications, approve/reject/suspend/restore actions, live user directory controls, analytics, competency mapping, announcements, and audit-oriented reporting
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Keep authorization server-side and do not expose administrator credentials.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run the admin bootstrap only after setting the temporary Replit Secrets and `ADMIN_BOOTSTRAP_ENABLED=true`; remove all bootstrap values immediately afterward.
+- Supabase email confirmation settings may require the new admin to verify their inbox before password login succeeds.
+- Do not promote an existing profile with the bootstrap command; it intentionally refuses if any admin exists or the requested email already has a profile.
 
 ## Pointers
 
