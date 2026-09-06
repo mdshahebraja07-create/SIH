@@ -59,7 +59,7 @@ async function main() {
   const data = text ? (JSON.parse(text) as SupabaseSignupResponse | SupabaseError) : null;
 
   if (!response.ok || !data || !("id" in data)) {
-    throw new Error(`Supabase signup failed: ${errorMessage(data)}`);
+    throw new Error(`Supabase signup failed (${response.status}): ${errorMessage(data)}`);
   }
 
   await db.insert(profiles).values({
